@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Tiny Farm</title>
+	<style>
+		body {
+			margin: 0;
+			background: #111;
+			color: #fff;
+			font-family: sans-serif;
+			display: flex;
+		}
+
+		#game-container {
+			margin: 16px;
+			position: relative;
+		}
+
+		canvas {
+			background: #223;
+			image-rendering: pixelated;
+			border: 2px solid #555;
+		}
+	</style>
+</head>
+<body>
+	<div id="game-container">
+		<canvas id="game" width="800" height="600"></canvas>
+	</div>
+
+	<!-- Everything else is split into modules -->
+	<script type="module" src="./main.js"></script>
+</body>
+</html>
