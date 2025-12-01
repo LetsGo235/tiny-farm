@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mini Farm V1</title>
+  <title>Mini Farm V1.5</title>
   <style>
     html, body {
       margin: 0;
@@ -77,7 +77,7 @@
     <canvas id="game"></canvas>
 
     <div id="hud">
-      <h1>Mini Farm V1</h1>
+      <h1>Mini Farm V1.5</h1>
 
       <div class="section">
         <strong>Area:</strong> <span id="area-name">Farm</span>
@@ -87,7 +87,7 @@
         <strong>Controls</strong>
         <div class="controls-text">
           Move: WASD / Arrow keys<br />
-          Action: Space (till / plant / harvest)
+          Action: Space (till / plant / harvest / talk to merchant)
         </div>
       </div>
 
@@ -109,13 +109,20 @@
 
       // ====== CONSTANTS ======
       const TILE_SIZE = 32;
-      const WORLD_WIDTH = 80;   // tiles
-      const WORLD_HEIGHT = 80;  // tiles
+      const WORLD_WIDTH = 64;
+      const WORLD_HEIGHT = 40;
       const VIEWPORT_WIDTH = 640;
       const VIEWPORT_HEIGHT = 360;
 
       const CROP_GROWTH_TIME = 12; // seconds to fully grown
       const CROP_STAGES = 3;       // visual stages before "ready"
+
+      // Farm and town layout (in tile coordinates)
+      const FARM_BOUNDS = { xMin: 4, xMax: 28, yMin: 8, yMax: 32 };
+      const TOWN_BOUNDS = { xMin: 38, xMax: 60, yMin: 8, yMax: 32 };
+      const PATH_Y = Math.floor((FARM_BOUNDS.yMin + FARM_BOUNDS.yMax) / 2);
+      const TOWN_CENTER_X = Math.floor((TOWN_BOUNDS.xMin + TOWN_BOUNDS.xMax) / 2);
+      const TOWN_CENTER_Y = PATH_Y;
 
       // ====== DOM & CANVAS ======
       const canvas = document.getElementById("game");
@@ -142,8 +149,11 @@
 
       // ====== WORLD SETUP ======
       const TileType = {
-        GRASS: 0,
-        TILLED: 1
+        FARM_GRASS: 0,
+        TILLED: 1,
+        PATH: 2,
+        TOWN_GRASS: 3,
+        TOWN_STONE: 4
       };
 
       const world = [];
@@ -151,17 +161,49 @@
         const row = [];
         for (let x = 0; x < WORLD_WIDTH; x++) {
           row.push({
-            type: TileType.GRASS,
-            crop: null // { age, stage }
+            type: TileType.TOWN_GRASS, // default base
+            crop: null                 // { age, stage }
           });
         }
         world.push(row);
       }
 
+      // Farm area – lush green
+      for (let y = FARM_BOUNDS.yMin; y <= FARM_BOUNDS.yMax; y++) {
+        for (let x = FARM_BOUNDS.xMin; x <= FARM_BOUNDS.xMax; x++) {
+          world[y][x].type = TileType.FARM_GRASS;
+        }
+      }
+
+      // Path between farm and town (slightly thick)
+      for (let x = FARM_BOUNDS.xMax - 1; x <= TOWN_BOUNDS.xMin + 1; x++) {
+        if (x < 0 || x >= WORLD_WIDTH) continue;
+        for (let yOff = -1; yOff <= 1; yOff++) {
+          const py = PATH_Y + yOff;
+          if (py >= 0 && py < WORLD_HEIGHT) {
+            world[py][x].type = TileType.PATH;
+          }
+        }
+      }
+
+      // Town stone cross (grey paths)
+      for (let x = TOWN_BOUNDS.xMin; x <= TOWN_BOUNDS.xMax; x++) {
+        if (TOWN_CENTER_Y >= TOWN_BOUNDS.yMin && TOWN_CENTER_Y <= TOWN_BOUNDS.yMax) {
+          world[TOWN_CENTER_Y][x].type = TileType.TOWN_STONE;
+        }
+      }
+      for (let y = TOWN_BOUNDS.yMin; y <= TOWN_BOUNDS.yMax; y++) {
+        world[y][TOWN_CENTER_X].type = TileType.TOWN_STONE;
+      }
+
       // ====== PLAYER & CAMERA ======
+      const playerStartX =
+        ((FARM_BOUNDS.xMin + FARM_BOUNDS.xMax) / 2) * TILE_SIZE + TILE_SIZE / 2;
+      const playerStartY = PATH_Y * TILE_SIZE + TILE_SIZE / 2;
+
       const player = {
-        x: (WORLD_WIDTH * TILE_SIZE) / 2,
-        y: (WORLD_HEIGHT * TILE_SIZE) / 2,
+        x: playerStartX,
+        y: playerStartY,
         width: 20,
         height: 24,
         speed: 140 // pixels per second
@@ -172,10 +214,21 @@
         y: 0
       };
 
+      // ====== NPC (merchant in town) ======
+      const npc = {
+        tileX: TOWN_CENTER_X,
+        tileY: TOWN_CENTER_Y - 2 // just above the central cross
+      };
+
+      function isOnNPCTile(tileX, tileY) {
+        return tileX === npc.tileX && tileY === npc.tileY;
+      }
+
       // ====== INVENTORY ======
       const inventory = {
         seeds: 5,
-        crops: 0
+        crops: 0,
+        money: 0
       };
 
       function updateInventoryUI() {
@@ -184,6 +237,7 @@
           <ul class="inventory-list">
             <li>Seeds: ${inventory.seeds}</li>
             <li>Crops: ${inventory.crops}</li>
+            <li>Money: ${inventory.money}g</li>
           </ul>
         `;
       }
@@ -191,16 +245,16 @@
       // ====== AUDIO ======
       // Put these files next to this HTML:
       //  - blip.wav        (small UI/text sound)
-      //  - bgm_farm.mp3    (left side of map)
-      //  - bgm_forest.mp3  (right side of map)
+      //  - bgm_farm.mp3    (farm + path)
+      //  - bgm_town.mp3    (town)
       const sounds = {
         blip: new Audio("blip.wav"),
         bgmFarm: new Audio("bgm_farm.mp3"),
-        bgmForest: new Audio("bgm_forest.mp3")
+        bgmTown: new Audio("bgm_town.mp3")
       };
 
       sounds.bgmFarm.loop = true;
-      sounds.bgmForest.loop = true;
+      sounds.bgmTown.loop = true;
 
       let audioInitialized = false;
       let currentArea = null;
@@ -208,11 +262,23 @@
 
       function getAreaForPosition(x, y) {
         const tileX = Math.floor(x / TILE_SIZE);
-        // Simple split: left half = farm, right half = forest
-        if (tileX < WORLD_WIDTH / 2) {
+        const tileY = Math.floor(y / TILE_SIZE);
+
+        if (
+          tileX >= FARM_BOUNDS.xMin && tileX <= FARM_BOUNDS.xMax &&
+          tileY >= FARM_BOUNDS.yMin && tileY <= FARM_BOUNDS.yMax
+        ) {
           return "farm";
         }
-        return "forest";
+
+        if (
+          tileX >= TOWN_BOUNDS.xMin && tileX <= TOWN_BOUNDS.xMax &&
+          tileY >= TOWN_BOUNDS.yMin && tileY <= TOWN_BOUNDS.yMax
+        ) {
+          return "town";
+        }
+
+        return "path";
       }
 
       function playBlip() {
@@ -228,9 +294,12 @@
       }
 
       function playBGMForArea(area) {
-        // Always update the area label
+        // HUD area label
         if (areaNameSpan) {
-          areaNameSpan.textContent = area.charAt(0).toUpperCase() + area.slice(1);
+          let label = "Farm";
+          if (area === "town") label = "Town";
+          else if (area === "path") label = "Path";
+          areaNameSpan.textContent = label;
         }
 
         if (!audioInitialized) return;
@@ -244,10 +313,10 @@
         }
 
         let bgm = null;
-        if (area === "farm") {
+        if (area === "farm" || area === "path") {
           bgm = sounds.bgmFarm;
-        } else if (area === "forest") {
-          bgm = sounds.bgmForest;
+        } else if (area === "town") {
+          bgm = sounds.bgmTown;
         }
 
         currentBGM = bgm;
@@ -320,6 +389,43 @@
         }
       }
 
+      // ====== FARM / TILE HELPERS ======
+      function isFarmTile(tileX, tileY) {
+        if (
+          tileX < FARM_BOUNDS.xMin || tileX > FARM_BOUNDS.xMax ||
+          tileY < FARM_BOUNDS.yMin || tileY > FARM_BOUNDS.yMax
+        ) {
+          return false;
+        }
+        const tile = world[tileY][tileX];
+        return (
+          tile.type === TileType.FARM_GRASS ||
+          tile.type === TileType.TILLED
+        );
+      }
+
+      // ====== NPC INTERACTION ======
+      function interactWithNPC() {
+        const CROP_PRICE = 10;
+        const SEED_PRICE = 5;
+
+        if (inventory.crops > 0) {
+          // Sell one crop
+          inventory.crops -= 1;
+          inventory.money += CROP_PRICE;
+          updateInventoryUI();
+          showMessage(`You sold 1 crop for ${CROP_PRICE}g.`);
+        } else if (inventory.money >= SEED_PRICE) {
+          // Buy one seed
+          inventory.money -= SEED_PRICE;
+          inventory.seeds += 1;
+          updateInventoryUI();
+          showMessage(`You bought 1 seed for ${SEED_PRICE}g.`);
+        } else {
+          showMessage("You need crops to sell or money to buy seeds.");
+        }
+      }
+
       // ====== INTERACTION (SPACEBAR) ======
       let wasSpaceDown = false;
 
@@ -339,15 +445,22 @@
           return;
         }
 
+        // First: check for NPC interaction
+        if (isOnNPCTile(tileX, tileY)) {
+          interactWithNPC();
+          return;
+        }
+
         const tile = world[tileY][tileX];
 
-        // Contextual action on Space:
-        // 1) Grass -> till soil
-        // 2) Tilled & no crop & have seeds -> plant
-        // 3) Tilled & grown crop -> harvest
-        // 4) Tilled & growing -> "not ready"
-        // 5) Tilled & no crop & no seeds -> "no seeds"
-        if (tile.type === TileType.GRASS) {
+        // If not in farm area, you can't do farming actions
+        if (!isFarmTile(tileX, tileY)) {
+          showMessage("You can't farm here.");
+          return;
+        }
+
+        // Farming actions
+        if (tile.type === TileType.FARM_GRASS) {
           tile.type = TileType.TILLED;
           showMessage("You tilled the soil.");
         } else {
@@ -434,15 +547,23 @@
             const screenX = x * TILE_SIZE - camera.x;
             const screenY = y * TILE_SIZE - camera.y;
 
-            // Base tile
-            if (tile.type === TileType.GRASS) {
-              // Slight color variation by position so it doesn't look perfectly flat
+            // Base tile color
+            if (tile.type === TileType.FARM_GRASS) {
               const noise = ((x * 13 + y * 7) % 10) - 5;
               const baseG = 125 + noise;
               ctx.fillStyle = `rgb(45, ${baseG}, 70)`;
+            } else if (tile.type === TileType.TILLED) {
+              ctx.fillStyle = "#6b4a2f";
+            } else if (tile.type === TileType.PATH) {
+              ctx.fillStyle = "#8b5a35"; // dirt path
+            } else if (tile.type === TileType.TOWN_GRASS) {
+              ctx.fillStyle = "#2a7f46"; // town-side green
+            } else if (tile.type === TileType.TOWN_STONE) {
+              ctx.fillStyle = "#7c828f"; // grey stone path
             } else {
-              ctx.fillStyle = "#6b4a2f"; // tilled soil
+              ctx.fillStyle = "#333"; // fallback
             }
+
             ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
 
             // Tile border
@@ -468,6 +589,24 @@
             }
           }
         }
+
+        // NPC draw
+        const npcScreenX = npc.tileX * TILE_SIZE - camera.x;
+        const npcScreenY = npc.tileY * TILE_SIZE - camera.y;
+        ctx.fillStyle = "#f2c089"; // body
+        ctx.fillRect(
+          npcScreenX + 8,
+          npcScreenY + 6,
+          TILE_SIZE - 16,
+          TILE_SIZE - 12
+        );
+        ctx.fillStyle = "#5a3a2a"; // hair/hat
+        ctx.fillRect(
+          npcScreenX + 8,
+          npcScreenY + 2,
+          TILE_SIZE - 16,
+          10
+        );
 
         // Player
         const playerScreenX = player.x - camera.x;
@@ -524,7 +663,7 @@
 
       // ====== INIT ======
       updateInventoryUI();
-      showMessage("Welcome to Mini Farm! Stand on a tile and press Space to till / plant / harvest.");
+      showMessage("Farm on the left, town on the right. Follow the path and visit the merchant!");
 
       requestAnimationFrame(gameLoop);
     })();
