@@ -2,91 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mini Farm V2</title>
+  <title>Mini Farm V3</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
+      overflow: hidden;
       background: #11151c;
-      color: #f1f1f1;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    #game-container {
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding: 16px;
-      box-sizing: border-box;
-      gap: 16px;
-    }
-
     #game {
-      border: 2px solid #3c445a;
+      display: block;
+      width: 100vw;
+      height: 100vh;
       background: #000;
       image-rendering: pixelated;
     }
 
-    #hud {
-      width: 260px;
-      font-size: 14px;
-      line-height: 1.4;
-    }
-
-    #hud h1 {
-      margin: 0 0 8px 0;
-      font-size: 18px;
-    }
-
-    .section {
-      margin-bottom: 12px;
-      padding: 8px;
-      background: #181e2a;
-      border-radius: 6px;
-      border: 1px solid #272f42;
-    }
-
-    #message-box {
-      min-height: 40px;
-      padding: 4px;
-      background: #101521;
-      border-radius: 4px;
-      border: 1px solid #2a3246;
-      font-size: 13px;
-    }
-
-    .inventory-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    .inventory-list li {
-      margin-bottom: 2px;
-    }
-
-    .controls-text {
-      font-size: 12px;
-      color: #c5cde0;
-    }
-
-    .seed-choice {
-      margin: 2px 2px 2px 0;
-      padding: 3px 7px;
-      font-size: 12px;
-      border-radius: 4px;
-      border: 1px solid #3b4258;
-      background: #222738;
-      color: #f1f1f1;
-      cursor: pointer;
-    }
-
-    .seed-choice:hover {
-      background: #333a4c;
-    }
-
-    /* Overlays */
     .overlay {
       position: fixed;
       inset: 0;
@@ -97,8 +31,7 @@
       z-index: 10;
     }
 
-    .start-window,
-    .shop-window {
+    .start-window {
       background: #181e2a;
       border-radius: 8px;
       border: 1px solid #272f42;
@@ -106,6 +39,7 @@
       min-width: 260px;
       max-width: 320px;
       box-shadow: 0 0 18px rgba(0, 0, 0, 0.7);
+      color: #f1f1f1;
     }
 
     .start-window h1 {
@@ -114,45 +48,10 @@
       font-size: 20px;
     }
 
-    .shop-window h2 {
-      margin: 0 0 6px 0;
-      font-size: 18px;
-    }
-
-    .shop-window h3 {
-      margin: 8px 0 4px 0;
-      font-size: 14px;
-    }
-
-    .shop-section {
-      margin-top: 4px;
-      padding: 6px;
-      background: #101521;
-      border-radius: 4px;
-      border: 1px solid #272f42;
-    }
-
-    .shop-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      font-size: 13px;
-      margin-bottom: 4px;
-    }
-
-    .shop-row span:first-child {
-      flex: 1;
-    }
-
-    .shop-row span:nth-child(2) {
-      width: 50px;
-      text-align: right;
-    }
-
-    .menu-btn,
-    .shop-btn {
-      padding: 6px 10px;
+    .menu-btn {
+      width: 100%;
+      padding: 8px 12px;
+      margin-top: 8px;
       background: #242b3d;
       border-radius: 4px;
       border: 1px solid #3b4258;
@@ -161,25 +60,15 @@
       font-size: 13px;
     }
 
-    .menu-btn {
-      width: 100%;
-      margin-top: 6px;
-    }
-
-    .menu-btn:first-of-type {
-      margin-top: 10px;
-    }
-
-    .menu-btn:hover,
-    .shop-btn:hover {
+    .menu-btn:hover {
       background: #343c52;
     }
 
-    /* Mobile controls */
     .hidden {
       display: none !important;
     }
 
+    /* Mobile controls (outside canvas, but over game) */
     #mobile-controls {
       position: fixed;
       left: 16px;
@@ -234,70 +123,20 @@
   </style>
 </head>
 <body>
-  <div id="game-container">
-    <canvas id="game"></canvas>
-
-    <div id="hud">
-      <h1>Mini Farm V2</h1>
-
-      <div class="section">
-        <strong>Area:</strong> <span id="area-name">Farm</span>
-      </div>
-
-      <div class="section">
-        <strong>Controls</strong>
-        <div class="controls-text">
-          Computer: WASD / Arrows, Space to interact<br />
-          Mobile: On-screen arrows + Interact button
-        </div>
-      </div>
-
-      <div class="section">
-        <strong>Message</strong>
-        <div id="message-box"></div>
-      </div>
-
-      <div class="section">
-        <strong>Seed Selection</strong>
-        <div id="seed-selection" class="controls-text"></div>
-      </div>
-
-      <div class="section">
-        <strong>Inventory</strong>
-        <div id="inventory"></div>
-      </div>
-    </div>
-  </div>
+  <canvas id="game"></canvas>
 
   <!-- Start screen -->
   <div id="start-screen" class="overlay">
     <div class="start-window">
       <h1>Mini Farm</h1>
-      <p style="font-size:13px;">
+      <p style="font-size:13px;margin-bottom:4px;">
         Choose how you want to play:
       </p>
       <button id="choose-computer" class="menu-btn">Computer (Keyboard)</button>
       <button id="choose-mobile" class="menu-btn">Mobile (Touch)</button>
-    </div>
-  </div>
-
-  <!-- Shop UI -->
-  <div id="shop-overlay" class="overlay hidden">
-    <div class="shop-window">
-      <h2>Merchant</h2>
-      <p style="font-size:13px;">Buy seeds and sell your crops.</p>
-
-      <div class="shop-section">
-        <h3>Buy Seeds</h3>
-        <div id="shop-buy-list"></div>
-      </div>
-
-      <div class="shop-section" style="margin-top:8px;">
-        <h3>Sell Crops</h3>
-        <div id="shop-sell-list"></div>
-      </div>
-
-      <button id="close-shop-btn" class="menu-btn" style="margin-top:10px;">Close</button>
+      <p style="font-size:11px;margin-top:10px;opacity:0.8;">
+        Controls can be changed later by refreshing the page.
+      </p>
     </div>
   </div>
 
@@ -325,67 +164,57 @@
       const TILE_SIZE = 32;
       const WORLD_WIDTH = 64;
       const WORLD_HEIGHT = 40;
-      const VIEWPORT_WIDTH = 640;
-      const VIEWPORT_HEIGHT = 360;
 
       const CROP_STAGES = 3;
 
-      // Farm and town layout
       const FARM_BOUNDS = { xMin: 4, xMax: 28, yMin: 8, yMax: 32 };
       const TOWN_BOUNDS = { xMin: 38, xMax: 60, yMin: 8, yMax: 32 };
       const PATH_Y = Math.floor((FARM_BOUNDS.yMin + FARM_BOUNDS.yMax) / 2);
       const TOWN_CENTER_X = Math.floor((TOWN_BOUNDS.xMin + TOWN_BOUNDS.xMax) / 2);
       const TOWN_CENTER_Y = PATH_Y;
 
+      const TEXTBOX_HEIGHT = 110;
+      const HOTBAR_SLOT_WIDTH = 64;
+      const HOTBAR_SLOT_HEIGHT = 64;
+      const HOTBAR_SLOT_GAP = 8;
+
       // Crop types
       const cropTypes = [
-        {
-          id: "wheat",
-          name: "Wheat",
-          growthTime: 10,
-          seedPrice: 5,
-          cropPrice: 10
-        },
-        {
-          id: "carrot",
-          name: "Carrot",
-          growthTime: 14,
-          seedPrice: 8,
-          cropPrice: 16
-        },
-        {
-          id: "turnip",
-          name: "Turnip",
-          growthTime: 18,
-          seedPrice: 12,
-          cropPrice: 24
-        }
+        { id: "wheat",  name: "Wheat",  growthTime: 10, seedPrice: 5,  cropPrice: 10 },
+        { id: "carrot", name: "Carrot", growthTime: 14, seedPrice: 8,  cropPrice: 16 },
+        { id: "turnip", name: "Turnip", growthTime: 18, seedPrice: 12, cropPrice: 24 }
       ];
-
       const cropTypeById = {};
-      cropTypes.forEach(t => {
-        cropTypeById[t.id] = t;
-      });
+      cropTypes.forEach(t => cropTypeById[t.id] = t);
 
       const cropColors = {
-        wheat: ["#3aa655", "#c5c56e", "#f4e38b"],
+        wheat:  ["#3aa655", "#c5c56e", "#f4e38b"],
         carrot: ["#2f864c", "#f49a3c", "#f4b23a"],
         turnip: ["#3c6b82", "#a78edb", "#f1d2ff"]
       };
-
       function getCropColor(cropId, stage) {
         const colors = cropColors[cropId] || ["#3aa655", "#6cd96c", "#f4e38b"];
         const idx = Math.max(0, Math.min(colors.length - 1, stage));
         return colors[idx];
       }
 
+      // Hotbar slots: seeds then crops
+      const hotbarSlots = [
+        { type: "seed", cropId: "wheat" },
+        { type: "seed", cropId: "carrot" },
+        { type: "seed", cropId: "turnip" },
+        { type: "crop", cropId: "wheat" },
+        { type: "crop", cropId: "carrot" },
+        { type: "crop", cropId: "turnip" }
+      ];
+      const HOTBAR_SLOT_COUNT = hotbarSlots.length;
+      let hotbarRects = [];
+      let selectedHotbarIndex = 0;
+      let currentSeedTypeId = hotbarSlots[0].cropId;
+
       // ====== DOM & CANVAS ======
       const canvas = document.getElementById("game");
       const ctx = canvas.getContext("2d");
-      const messageBox = document.getElementById("message-box");
-      const inventoryDiv = document.getElementById("inventory");
-      const areaNameSpan = document.getElementById("area-name");
-      const seedSelectionDiv = document.getElementById("seed-selection");
 
       const startScreen = document.getElementById("start-screen");
       const chooseComputerBtn = document.getElementById("choose-computer");
@@ -398,14 +227,13 @@
       const btnRight = document.getElementById("btn-right");
       const interactButton = document.getElementById("btn-interact");
 
-      const shopOverlay = document.getElementById("shop-overlay");
-      const shopBuyList = document.getElementById("shop-buy-list");
-      const shopSellList = document.getElementById("shop-sell-list");
-      const closeShopBtn = document.getElementById("close-shop-btn");
-
-      canvas.width = VIEWPORT_WIDTH;
-      canvas.height = VIEWPORT_HEIGHT;
-      ctx.imageSmoothingEnabled = false;
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        // hotbar rects will be recalculated in drawHUD each frame
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
 
       // ====== CONTROL MODE ======
       let controlMode = null; // "keyboard" | "mobile"
@@ -416,7 +244,6 @@
         controlMode = "keyboard";
         startScreen.classList.add("hidden");
       });
-
       chooseMobileBtn.addEventListener("click", () => {
         controlMode = "mobile";
         startScreen.classList.add("hidden");
@@ -427,9 +254,7 @@
       function setupMobileControls() {
         const attachDir = (btn, dir) => {
           if (!btn) return;
-          const setDir = (value) => {
-            mobileInput[dir] = value;
-          };
+          const setDir = (value) => { mobileInput[dir] = value; };
           ["pointerdown", "mousedown", "touchstart"].forEach(ev => {
             btn.addEventListener(ev, (e) => {
               e.preventDefault();
@@ -458,7 +283,6 @@
           });
         }
       }
-
       setupMobileControls();
 
       // ====== INPUT (Keyboard) ======
@@ -468,10 +292,62 @@
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
           e.preventDefault();
         }
+        // Hotbar keys 1-6
+        if (e.code.startsWith("Digit")) {
+          const n = parseInt(e.code.slice(5), 10);
+          if (n >= 1 && n <= HOTBAR_SLOT_COUNT) {
+            selectHotbarSlot(n - 1);
+          }
+        }
       });
       window.addEventListener("keyup", (e) => {
         keys[e.code] = false;
       });
+
+      // ====== POINTER (Mouse / Touch) ======
+      function getCanvasPos(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY
+        };
+      }
+
+      function handlePointerDown(x, y) {
+        // If dialogue is active, treat click as interact
+        if (dialogue) {
+          handleDialogueInteract();
+          return;
+        }
+        // Shop clicks
+        if (shopOpen) {
+          handleShopClick(x, y);
+          return;
+        }
+        // Hotbar clicks
+        const slotIndex = hitTestHotbar(x, y);
+        if (slotIndex !== -1) {
+          selectHotbarSlot(slotIndex);
+          return;
+        }
+        // (Optional: world click behaviour can go here)
+      }
+
+      canvas.addEventListener("mousedown", (e) => {
+        const pos = getCanvasPos(e.clientX, e.clientY);
+        handlePointerDown(pos.x, pos.y);
+      });
+
+      canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        if (e.touches.length > 0) {
+          const t = e.touches[0];
+          const pos = getCanvasPos(t.clientX, t.clientY);
+          handlePointerDown(pos.x, pos.y);
+        }
+      }, { passive: false });
 
       // ====== WORLD SETUP ======
       const TileType = {
@@ -523,8 +399,7 @@
       }
 
       // ====== PLAYER & CAMERA ======
-      const playerStartX =
-        ((FARM_BOUNDS.xMin + FARM_BOUNDS.xMax) / 2) * TILE_SIZE + TILE_SIZE / 2;
+      const playerStartX = ((FARM_BOUNDS.xMin + FARM_BOUNDS.xMax) / 2) * TILE_SIZE + TILE_SIZE / 2;
       const playerStartY = PATH_Y * TILE_SIZE + TILE_SIZE / 2;
 
       const player = {
@@ -535,117 +410,91 @@
         speed: 140
       };
 
-      const camera = {
-        x: 0,
-        y: 0
-      };
+      const camera = { x: 0, y: 0 };
 
       // ====== NPC ======
       const npc = {
         tileX: TOWN_CENTER_X,
         tileY: TOWN_CENTER_Y - 2
       };
-
       function isOnNPCTile(tileX, tileY) {
         return tileX === npc.tileX && tileY === npc.tileY;
       }
 
-      // ====== INVENTORY ======
+      // ====== INVENTORY & MILESTONES ======
       const inventory = {
         money: 0,
         seeds: {},
         crops: {}
       };
-
       cropTypes.forEach((t, index) => {
         inventory.seeds[t.id] = index === 0 ? 5 : 0; // start with some wheat seeds
         inventory.crops[t.id] = 0;
       });
 
-      let currentSeedTypeId = cropTypes[0].id;
+      const milestones = {
+        firstPlant: false,
+        firstHarvest: false,
+        firstEnterTown: false
+      };
 
-      function updateInventoryUI() {
-        if (!inventoryDiv) return;
-
-        const seedLines = cropTypes
-          .map(t => `<li>${t.name} seeds: ${inventory.seeds[t.id] || 0}</li>`)
-          .join("");
-        const cropLines = cropTypes
-          .map(t => `<li>${t.name}: ${inventory.crops[t.id] || 0}</li>`)
-          .join("");
-
-        inventoryDiv.innerHTML = `
-          <ul class="inventory-list">
-            <li><strong>Money:</strong> ${inventory.money}g</li>
-          </ul>
-          <div style="margin-top:4px;font-size:13px;">
-            <strong>Seeds</strong>
-            <ul class="inventory-list">${seedLines}</ul>
-            <strong>Crops</strong>
-            <ul class="inventory-list">${cropLines}</ul>
-          </div>
-        `;
+      function selectHotbarSlot(index) {
+        if (index < 0 || index >= HOTBAR_SLOT_COUNT) return;
+        selectedHotbarIndex = index;
+        const slot = hotbarSlots[index];
+        if (slot.type === "seed") {
+          currentSeedTypeId = slot.cropId;
+          const t = cropTypeById[currentSeedTypeId];
+          if (t) showTextBox(["Selected " + t.name + " seeds."]);
+        } else {
+          const t = cropTypeById[slot.cropId];
+          if (t) showTextBox(["Holding " + t.name + ". Sell these in town."]);
+        }
       }
 
-      function updateSeedSelectionUI() {
-        if (!seedSelectionDiv) return;
-        const html = cropTypes
-          .map(t => {
-            const selected = t.id === currentSeedTypeId;
-            return `<button class="seed-choice" data-id="${t.id}">${selected ? "★ " : ""}${t.name}</button>`;
-          })
-          .join(" ");
-        seedSelectionDiv.innerHTML = html;
+      function hitTestHotbar(x, y) {
+        for (let i = 0; i < hotbarRects.length; i++) {
+          const r = hotbarRects[i];
+          if (!r) continue;
+          if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) {
+            return i;
+          }
+        }
+        return -1;
       }
-
-      seedSelectionDiv.addEventListener("click", (e) => {
-        const target = e.target;
-        if (!target || !target.dataset || !target.dataset.id) return;
-        const id = target.dataset.id;
-        if (!cropTypeById[id]) return;
-        currentSeedTypeId = id;
-        updateSeedSelectionUI();
-        const t = cropTypeById[id];
-        showMessage(`Selected ${t.name} seeds.`);
-      });
 
       // ====== AUDIO ======
-      // Files next to index.html:
-      //  - blip.wav
-      //  - bgm_farm.mp3
-      //  - bgm_town.mp3
       const sounds = {
         blip: new Audio("blip.wav"),
         bgmFarm: new Audio("bgm_farm.mp3"),
         bgmTown: new Audio("bgm_town.mp3")
       };
-
       sounds.bgmFarm.loop = true;
       sounds.bgmTown.loop = true;
 
       let audioInitialized = false;
-      let currentArea = null;
-      let currentBGM = null;
+      let currentBgmArea = null;
+      let hudArea = "farm";
+      let lastArea = null;
 
       function getAreaForPosition(x, y) {
         const tileX = Math.floor(x / TILE_SIZE);
         const tileY = Math.floor(y / TILE_SIZE);
-
-        if (
-          tileX >= FARM_BOUNDS.xMin && tileX <= FARM_BOUNDS.xMax &&
-          tileY >= FARM_BOUNDS.yMin && tileY <= FARM_BOUNDS.yMax
-        ) {
+        if (tileX >= FARM_BOUNDS.xMin && tileX <= FARM_BOUNDS.xMax &&
+            tileY >= FARM_BOUNDS.yMin && tileY <= FARM_BOUNDS.yMax) {
           return "farm";
         }
-
-        if (
-          tileX >= TOWN_BOUNDS.xMin && tileX <= TOWN_BOUNDS.xMax &&
-          tileY >= TOWN_BOUNDS.yMin && tileY <= TOWN_BOUNDS.yMax
-        ) {
+        if (tileX >= TOWN_BOUNDS.xMin && tileX <= TOWN_BOUNDS.xMax &&
+            tileY >= TOWN_BOUNDS.yMin && tileY <= TOWN_BOUNDS.yMax) {
           return "town";
         }
-
         return "path";
+      }
+
+      function areaLabel(area) {
+        if (area === "town") return "Town";
+        if (area === "path") return "Path";
+        return "Farm";
       }
 
       function playBlip() {
@@ -658,35 +507,21 @@
         } catch (err) {}
       }
 
-      function playBGMForArea(area) {
-        if (areaNameSpan) {
-          let label = "Farm";
-          if (area === "town") label = "Town";
-          else if (area === "path") label = "Path";
-          areaNameSpan.textContent = label;
-        }
-
+      function playBgmForArea(area) {
+        hudArea = area;
         if (!audioInitialized) return;
-        if (currentArea === area) return;
+        if (currentBgmArea === area) return;
+        currentBgmArea = area;
 
-        currentArea = area;
+        if (sounds.bgmFarm) { sounds.bgmFarm.pause(); sounds.bgmFarm.currentTime = 0; }
+        if (sounds.bgmTown) { sounds.bgmTown.pause(); sounds.bgmTown.currentTime = 0; }
 
-        if (currentBGM) {
-          currentBGM.pause();
-          currentBGM.currentTime = 0;
-        }
-
-        let bgm = null;
         if (area === "farm" || area === "path") {
-          bgm = sounds.bgmFarm;
+          sounds.bgmFarm.volume = 0.6;
+          sounds.bgmFarm.play().catch(() => {});
         } else if (area === "town") {
-          bgm = sounds.bgmTown;
-        }
-
-        currentBGM = bgm;
-        if (currentBGM) {
-          currentBGM.volume = 0.6;
-          currentBGM.play().catch(() => {});
+          sounds.bgmTown.volume = 0.6;
+          sounds.bgmTown.play().catch(() => {});
         }
       }
 
@@ -694,7 +529,7 @@
         if (audioInitialized) return;
         audioInitialized = true;
         const area = getAreaForPosition(player.x, player.y);
-        playBGMForArea(area);
+        playBgmForArea(area);
       }
 
       window.addEventListener("keydown", () => initAudio(), { once: true });
@@ -703,11 +538,7 @@
 
       // ====== CROPS ======
       function plantCrop(tile, cropId) {
-        tile.crop = {
-          age: 0,
-          stage: 0,
-          cropId
-        };
+        tile.crop = { age: 0, stage: 0, cropId };
       }
 
       function updateCrops(dt) {
@@ -715,160 +546,148 @@
           const row = world[y];
           for (let x = 0; x < WORLD_WIDTH; x++) {
             const tile = row[x];
-            if (tile.crop) {
-              const type = cropTypeById[tile.crop.cropId];
-              const growthTime = type ? type.growthTime : 12;
-              const perStage = growthTime / (CROP_STAGES + 1);
+            if (!tile.crop) continue;
+            const type = cropTypeById[tile.crop.cropId];
+            const growthTime = type ? type.growthTime : 12;
+            const perStage = growthTime / (CROP_STAGES + 1);
+            tile.crop.age += dt;
+            tile.crop.stage = Math.min(
+              CROP_STAGES,
+              Math.floor(tile.crop.age / perStage)
+            );
+          }
+        }
+      }
 
-              tile.crop.age += dt;
-              tile.crop.stage = Math.min(
-                CROP_STAGES,
-                Math.floor(tile.crop.age / perStage)
-              );
+      // ====== DIALOGUE / TEXTBOX (TYPEWRITER) ======
+      let dialogue = null; // { lines, index, visibleChars, doneLine, time, speed, onComplete }
+
+      function showTextBox(lines, options = {}) {
+        // If another dialogue is active, just replace it (simple behaviour)
+        dialogue = {
+          lines: Array.isArray(lines) ? lines : [String(lines)],
+          index: 0,
+          visibleChars: 0,
+          doneLine: false,
+          time: 0,
+          speed: options.speed || 50, // chars per second
+          onComplete: options.onComplete || null
+        };
+      }
+
+      function updateDialogue(dt) {
+        if (!dialogue) return;
+        const currentLine = dialogue.lines[dialogue.index];
+        if (!dialogue.doneLine) {
+          dialogue.time += dt;
+          const targetChars = Math.floor(dialogue.time * dialogue.speed);
+          const prevChars = dialogue.visibleChars;
+          const newChars = Math.min(targetChars, currentLine.length);
+          if (newChars > prevChars) {
+            // play blip for each new non-space char
+            for (let i = prevChars; i < newChars; i++) {
+              const ch = currentLine[i];
+              if (ch && ch.trim() !== "") {
+                playBlip();
+              }
+            }
+            dialogue.visibleChars = newChars;
+            if (dialogue.visibleChars >= currentLine.length) {
+              dialogue.doneLine = true;
             }
           }
         }
       }
 
-      // ====== MESSAGES ======
-      let currentMessage = "";
-      let messageTimer = 0;
-      const MESSAGE_DURATION = 2.0;
-
-      function showMessage(text) {
-        currentMessage = text;
-        messageTimer = MESSAGE_DURATION;
-        if (messageBox) {
-          messageBox.textContent = text;
+      function handleDialogueInteract() {
+        if (!dialogue) return false;
+        const currentLine = dialogue.lines[dialogue.index];
+        if (!dialogue.doneLine) {
+          // Skip to full line
+          dialogue.visibleChars = currentLine.length;
+          dialogue.doneLine = true;
+          return true;
         }
-        playBlip();
-      }
-
-      function updateMessages(dt) {
-        if (messageTimer > 0) {
-          messageTimer -= dt;
-          if (messageTimer <= 0) {
-            messageTimer = 0;
-            currentMessage = "";
-            if (messageBox) {
-              messageBox.textContent = "";
-            }
-          }
+        // Line finished
+        if (dialogue.index < dialogue.lines.length - 1) {
+          dialogue.index++;
+          dialogue.visibleChars = 0;
+          dialogue.doneLine = false;
+          dialogue.time = 0;
+          return true;
         }
-      }
-
-      // ====== FARM / TILE HELPERS ======
-      function isFarmTile(tileX, tileY) {
-        if (
-          tileX < FARM_BOUNDS.xMin || tileX > FARM_BOUNDS.xMax ||
-          tileY < FARM_BOUNDS.yMin || tileY > FARM_BOUNDS.yMax
-        ) {
-          return false;
-        }
-        const tile = world[tileY][tileX];
-        return (
-          tile.type === TileType.FARM_GRASS ||
-          tile.type === TileType.TILLED
-        );
+        // All lines finished
+        const cb = dialogue.onComplete;
+        dialogue = null;
+        if (typeof cb === "function") cb();
+        return true;
       }
 
       // ====== SHOP ======
       let shopOpen = false;
-
-      function buildShopUI() {
-        if (!shopBuyList || !shopSellList) return;
-
-        let buyHtml = "";
-        let sellHtml = "";
-
-        cropTypes.forEach(t => {
-          buyHtml += `
-            <div class="shop-row">
-              <span>${t.name} Seed</span>
-              <span>${t.seedPrice}g</span>
-              <button class="shop-btn" data-action="buy" data-id="${t.id}">Buy</button>
-            </div>
-          `;
-
-          sellHtml += `
-            <div class="shop-row">
-              <span>${t.name}</span>
-              <span>${t.cropPrice}g</span>
-              <button class="shop-btn" data-action="sell1" data-id="${t.id}">Sell 1</button>
-              <button class="shop-btn" data-action="sellAll" data-id="${t.id}">Sell All</button>
-            </div>
-          `;
-        });
-
-        shopBuyList.innerHTML = buyHtml;
-        shopSellList.innerHTML = sellHtml;
-      }
+      let shopButtons = []; // clickable regions this frame
 
       function openShop() {
-        if (!shopOverlay) return;
         shopOpen = true;
-        buildShopUI();
-        shopOverlay.classList.remove("hidden");
-        showMessage("Talking to the merchant...");
       }
-
       function closeShop() {
-        if (!shopOverlay) return;
         shopOpen = false;
-        shopOverlay.classList.add("hidden");
       }
 
-      if (closeShopBtn) {
-        closeShopBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          closeShop();
-        });
-      }
-
-      if (shopOverlay) {
-        shopOverlay.addEventListener("click", (e) => {
-          const target = e.target;
-          if (!target || !target.dataset) return;
-          const action = target.dataset.action;
-          const id = target.dataset.id;
-          if (!action || !id || !cropTypeById[id]) return;
-
-          const type = cropTypeById[id];
-
-          if (action === "buy") {
-            const price = type.seedPrice;
-            if (inventory.money >= price) {
-              inventory.money -= price;
-              inventory.seeds[id] = (inventory.seeds[id] || 0) + 1;
-              updateInventoryUI();
-              showMessage(`Bought 1 ${type.name} seed.`);
-            } else {
-              showMessage("Not enough money.");
-            }
-          } else if (action === "sell1") {
-            if (inventory.crops[id] > 0) {
-              inventory.crops[id] -= 1;
-              inventory.money += type.cropPrice;
-              updateInventoryUI();
-              showMessage(`Sold 1 ${type.name}.`);
-            } else {
-              showMessage(`You have no ${type.name} to sell.`);
-            }
-          } else if (action === "sellAll") {
-            const amount = inventory.crops[id];
-            if (amount > 0) {
-              inventory.crops[id] = 0;
-              inventory.money += type.cropPrice * amount;
-              updateInventoryUI();
-              showMessage(`Sold ${amount} ${type.name}(s).`);
-            } else {
-              showMessage(`You have no ${type.name} to sell.`);
-            }
+      function handleShopClick(x, y) {
+        for (const btn of shopButtons) {
+          if (x >= btn.x && x <= btn.x + btn.w &&
+              y >= btn.y && y <= btn.y + btn.h) {
+            shopButtonAction(btn);
+            return;
           }
-        });
+        }
       }
 
-      // ====== INTERACTION (SPACE / MOBILE) ======
+      function shopButtonAction(btn) {
+        const type = cropTypeById[btn.cropId];
+        if (!type) return;
+
+        if (btn.action === "buy") {
+          const price = type.seedPrice;
+          if (inventory.money >= price) {
+            inventory.money -= price;
+            inventory.seeds[type.id] = (inventory.seeds[type.id] || 0) + 1;
+            showTextBox(["Bought 1 " + type.name + " seed."]);
+          } else {
+            showTextBox(["Not enough money."]);
+          }
+        } else if (btn.action === "sell1") {
+          if (inventory.crops[type.id] > 0) {
+            inventory.crops[type.id] -= 1;
+            inventory.money += type.cropPrice;
+            showTextBox(["Sold 1 " + type.name + "."]);
+          } else {
+            showTextBox(["You have no " + type.name + " to sell."]);
+          }
+        } else if (btn.action === "sellAll") {
+          const amount = inventory.crops[type.id];
+          if (amount > 0) {
+            inventory.crops[type.id] = 0;
+            inventory.money += type.cropPrice * amount;
+            showTextBox(["Sold " + amount + " " + type.name + "(s)."]);
+          } else {
+            showTextBox(["You have no " + type.name + " to sell."]);
+          }
+        }
+      }
+
+      // ====== MESSAGES & HELPERS ======
+      function isFarmTile(tileX, tileY) {
+        if (tileX < FARM_BOUNDS.xMin || tileX > FARM_BOUNDS.xMax ||
+            tileY < FARM_BOUNDS.yMin || tileY > FARM_BOUNDS.yMax) {
+          return false;
+        }
+        const tile = world[tileY][tileX];
+        return (tile.type === TileType.FARM_GRASS || tile.type === TileType.TILLED);
+      }
+
+      // ====== INTERACTION (Space / Mobile) ======
       let wasSpaceDown = false;
 
       function handleActionInput() {
@@ -881,61 +700,98 @@
           mobileInteractQueued = false;
         }
 
-        if (keyboardTriggered || mobileTriggered) {
-          interactWithTile();
-        }
-
-        wasSpaceDown = spaceDown;
-      }
-
-      function interactWithTile() {
-        const tileX = Math.floor(player.x / TILE_SIZE);
-        const tileY = Math.floor(player.y / TILE_SIZE);
-
-        if (tileX < 0 || tileX >= WORLD_WIDTH || tileY < 0 || tileY >= WORLD_HEIGHT) {
+        const triggered = keyboardTriggered || mobileTriggered;
+        if (!triggered) {
+          wasSpaceDown = spaceDown;
           return;
         }
 
-        // NPC interaction
+        // Priority: dialogue -> shop -> world
+        if (dialogue) {
+          handleDialogueInteract();
+          wasSpaceDown = spaceDown;
+          return;
+        }
+
+        if (shopOpen) {
+          // Interact closes the shop
+          closeShop();
+          wasSpaceDown = spaceDown;
+          return;
+        }
+
+        interactWithWorld();
+        wasSpaceDown = spaceDown;
+      }
+
+      function interactWithWorld() {
+        const tileX = Math.floor(player.x / TILE_SIZE);
+        const tileY = Math.floor(player.y / TILE_SIZE);
+        if (tileX < 0 || tileX >= WORLD_WIDTH || tileY < 0 || tileY >= WORLD_HEIGHT) return;
+
+        // NPC
         if (isOnNPCTile(tileX, tileY)) {
-          if (!shopOpen) {
-            openShop();
-          }
+          showTextBox(
+            [
+              "Hey there! I buy crops and sell seeds.",
+              "Grow good stuff and I'll make it worth your while."
+            ],
+            { onComplete: () => openShop() }
+          );
           return;
         }
 
         const tile = world[tileY][tileX];
 
-        // Farming only in farm area
+        // Only farm in farm area
         if (!isFarmTile(tileX, tileY)) {
-          showMessage("You can't farm here.");
+          showTextBox(["You can't farm here."]);
           return;
         }
 
-        const currentType = cropTypeById[currentSeedTypeId];
+        const slot = hotbarSlots[selectedHotbarIndex];
+        if (!slot || slot.type !== "seed") {
+          showTextBox(["Select seeds in your hotbar first."]);
+          return;
+        }
+
+        const seedCropId = slot.cropId;
+        const seedType = cropTypeById[seedCropId];
 
         if (tile.type === TileType.FARM_GRASS) {
           tile.type = TileType.TILLED;
-          showMessage("You tilled the soil.");
+          // Tilling is minor, no textbox needed.
         } else {
           if (!tile.crop) {
-            if (inventory.seeds[currentSeedTypeId] > 0) {
-              plantCrop(tile, currentSeedTypeId);
-              inventory.seeds[currentSeedTypeId] -= 1;
-              updateInventoryUI();
-              showMessage(`You planted ${currentType.name}.`);
+            if ((inventory.seeds[seedCropId] || 0) > 0) {
+              plantCrop(tile, seedCropId);
+              inventory.seeds[seedCropId] -= 1;
+              if (!milestones.firstPlant) {
+                milestones.firstPlant = true;
+                showTextBox([
+                  "You planted your first " + seedType.name + "!",
+                  "Now wait for it to grow before harvesting."
+                ]);
+              }
             } else {
-              showMessage(`You have no ${currentType.name} seeds.`);
+              showTextBox(["You have no " + seedType.name + " seeds."]);
             }
           } else if (tile.crop && tile.crop.stage >= CROP_STAGES) {
             const harvestedId = tile.crop.cropId;
             const harvestedType = cropTypeById[harvestedId];
             tile.crop = null;
             inventory.crops[harvestedId] = (inventory.crops[harvestedId] || 0) + 1;
-            updateInventoryUI();
-            showMessage(`You harvested ${harvestedType.name}!`);
+            if (!milestones.firstHarvest) {
+              milestones.firstHarvest = true;
+              showTextBox([
+                "You harvested your first " + harvestedType.name + "!",
+                "Take it to town and sell it to the merchant."
+              ]);
+            } else {
+              showTextBox(["You harvested " + harvestedType.name + "."]);
+            }
           } else if (tile.crop) {
-            showMessage("It's not ready yet...");
+            showTextBox(["It's not ready yet..."]);
           }
         }
       }
@@ -956,9 +812,9 @@
         if (right) dx += 1;
 
         if (dx !== 0 || dy !== 0) {
-          const length = Math.hypot(dx, dy) || 1;
-          dx /= length;
-          dy /= length;
+          const len = Math.hypot(dx, dy) || 1;
+          dx /= len;
+          dy /= len;
 
           player.x += dx * player.speed * dt;
           player.y += dy * player.speed * dt;
@@ -977,11 +833,13 @@
 
       // ====== CAMERA ======
       function updateCamera() {
-        camera.x = player.x - VIEWPORT_WIDTH / 2;
-        camera.y = player.y - VIEWPORT_HEIGHT / 2;
+        const vw = canvas.width;
+        const vh = canvas.height;
+        camera.x = player.x - vw / 2;
+        camera.y = player.y - vh / 2;
 
-        const maxCamX = WORLD_WIDTH * TILE_SIZE - VIEWPORT_WIDTH;
-        const maxCamY = WORLD_HEIGHT * TILE_SIZE - VIEWPORT_HEIGHT;
+        const maxCamX = WORLD_WIDTH * TILE_SIZE - vw;
+        const maxCamY = WORLD_HEIGHT * TILE_SIZE - vh;
 
         if (camera.x < 0) camera.x = 0;
         if (camera.y < 0) camera.y = 0;
@@ -990,16 +848,18 @@
       }
 
       // ====== DRAWING ======
-      function draw() {
+      function drawWorld() {
+        const vw = canvas.width;
+        const vh = canvas.height;
+
         ctx.fillStyle = "#1b1f2a";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, vw, vh);
 
         const startTileX = Math.floor(camera.x / TILE_SIZE);
         const startTileY = Math.floor(camera.y / TILE_SIZE);
-        const endTileX = Math.ceil((camera.x + VIEWPORT_WIDTH) / TILE_SIZE);
-        const endTileY = Math.ceil((camera.y + VIEWPORT_HEIGHT) / TILE_SIZE);
+        const endTileX = Math.ceil((camera.x + vw) / TILE_SIZE);
+        const endTileY = Math.ceil((camera.y + vh) / TILE_SIZE);
 
-        // Tiles & crops
         for (let y = startTileY; y < endTileY; y++) {
           if (y < 0 || y >= WORLD_HEIGHT) continue;
           for (let x = startTileX; x < endTileX; x++) {
@@ -1037,7 +897,6 @@
               const size = 10 + stage * 4;
               const cx = screenX + TILE_SIZE / 2 - size / 2;
               const cy = screenY + TILE_SIZE / 2 - size / 2;
-
               ctx.fillStyle = color;
               ctx.fillRect(cx, cy, size, size);
               ctx.strokeStyle = "rgba(0,0,0,0.5)";
@@ -1045,46 +904,35 @@
             }
           }
         }
+      }
 
-        // NPC
-        const npcScreenX = npc.tileX * TILE_SIZE - camera.x;
-        const npcScreenY = npc.tileY * TILE_SIZE - camera.y;
+      function drawNPC() {
+        const screenX = npc.tileX * TILE_SIZE - camera.x;
+        const screenY = npc.tileY * TILE_SIZE - camera.y;
         ctx.fillStyle = "#f2c089";
-        ctx.fillRect(
-          npcScreenX + 8,
-          npcScreenY + 6,
-          TILE_SIZE - 16,
-          TILE_SIZE - 12
-        );
+        ctx.fillRect(screenX + 8, screenY + 6, TILE_SIZE - 16, TILE_SIZE - 12);
         ctx.fillStyle = "#5a3a2a";
-        ctx.fillRect(
-          npcScreenX + 8,
-          npcScreenY + 2,
-          TILE_SIZE - 16,
-          10
-        );
+        ctx.fillRect(screenX + 8, screenY + 2, TILE_SIZE - 16, 10);
+      }
 
-        // Player
-        const playerScreenX = player.x - camera.x;
-        const playerScreenY = player.y - camera.y;
-
+      function drawPlayer() {
+        const screenX = player.x - camera.x;
+        const screenY = player.y - camera.y;
         ctx.fillStyle = "#f5d37b";
         ctx.fillRect(
-          playerScreenX - player.width / 2,
-          playerScreenY - player.height / 2,
+          screenX - player.width / 2,
+          screenY - player.height / 2,
           player.width,
           player.height
         );
-
         ctx.fillStyle = "#3b2d2a";
         ctx.fillRect(
-          playerScreenX - player.width / 2,
-          playerScreenY - player.height / 2,
+          screenX - player.width / 2,
+          screenY - player.height / 2,
           player.width,
           player.height / 3
         );
 
-        // Highlight tile under player
         const tileX = Math.floor(player.x / TILE_SIZE);
         const tileY = Math.floor(player.y / TILE_SIZE);
         const highlightX = tileX * TILE_SIZE - camera.x;
@@ -1093,18 +941,345 @@
         ctx.strokeRect(highlightX + 2, highlightY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
       }
 
+      function drawHUD() {
+        const vw = canvas.width;
+        const vh = canvas.height;
+
+        // Area + money box (top-left)
+        const boxW = 160;
+        const boxH = 52;
+        const pad = 12;
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(pad, pad, boxW, boxH);
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.strokeRect(pad, pad, boxW, boxH);
+
+        ctx.fillStyle = "#f1f1f1";
+        ctx.font = "14px sans-serif";
+        ctx.fillText("Area: " + areaLabel(hudArea), pad + 8, pad + 20);
+        ctx.fillText("Money: " + inventory.money + "g", pad + 8, pad + 38);
+
+        // Hotbar (bottom center)
+        hotbarRects = [];
+        const totalWidth = HOTBAR_SLOT_COUNT * HOTBAR_SLOT_WIDTH +
+                           (HOTBAR_SLOT_COUNT - 1) * HOTBAR_SLOT_GAP;
+        const startX = (vw - totalWidth) / 2;
+        const y = vh - HOTBAR_SLOT_HEIGHT - 16;
+
+        for (let i = 0; i < HOTBAR_SLOT_COUNT; i++) {
+          const slot = hotbarSlots[i];
+          const x = startX + i * (HOTBAR_SLOT_WIDTH + HOTBAR_SLOT_GAP);
+          const r = { x, y, w: HOTBAR_SLOT_WIDTH, h: HOTBAR_SLOT_HEIGHT };
+          hotbarRects.push(r);
+
+          // Base
+          ctx.fillStyle = "rgba(0,0,0,0.7)";
+          ctx.fillRect(x, y, HOTBAR_SLOT_WIDTH, HOTBAR_SLOT_HEIGHT);
+          ctx.strokeStyle = i === selectedHotbarIndex ? "#f4e38b" : "rgba(255,255,255,0.4)";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, HOTBAR_SLOT_WIDTH, HOTBAR_SLOT_HEIGHT);
+          ctx.lineWidth = 1;
+
+          // Icon
+          const type = cropTypeById[slot.cropId];
+          const color = getCropColor(slot.cropId, 0);
+          ctx.fillStyle = color;
+          ctx.fillRect(x + 10, y + 14, 24, 24);
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.strokeRect(x + 10, y + 14, 24, 24);
+
+          // Name initial & type
+          ctx.fillStyle = "#f1f1f1";
+          ctx.font = "11px sans-serif";
+          const label = type ? type.name[0] : "?";
+          ctx.fillText(label, x + 18, y + 30);
+
+          ctx.fillStyle = "rgba(220,220,220,0.8)";
+          ctx.font = "10px sans-serif";
+          ctx.fillText(slot.type === "seed" ? "Seed" : "Crop", x + 8, y + 50);
+
+          // Quantity
+          const qty = slot.type === "seed"
+            ? (inventory.seeds[slot.cropId] || 0)
+            : (inventory.crops[slot.cropId] || 0);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "11px sans-serif";
+          ctx.textAlign = "right";
+          ctx.fillText(String(qty), x + HOTBAR_SLOT_WIDTH - 6, y + HOTBAR_SLOT_HEIGHT - 8);
+          ctx.textAlign = "left";
+
+          // Number key
+          ctx.fillStyle = "rgba(255,255,255,0.7)";
+          ctx.font = "10px sans-serif";
+          ctx.fillText(String(i + 1), x + 6, y + 14);
+        }
+
+        // Controls hint (top-right, small)
+        ctx.fillStyle = "rgba(0,0,0,0.45)";
+        const hintW = 190;
+        const hintH = 40;
+        const hx = vw - hintW - pad;
+        const hy = pad;
+        ctx.fillRect(hx, hy, hintW, hintH);
+        ctx.strokeStyle = "rgba(255,255,255,0.25)";
+        ctx.strokeRect(hx, hy, hintW, hintH);
+        ctx.fillStyle = "#c5cde0";
+        ctx.font = "11px sans-serif";
+        ctx.fillText("Move: WASD / Arrows", hx + 8, hy + 16);
+        ctx.fillText("Interact: Space / Button", hx + 8, hy + 30);
+      }
+
+      function drawDialogueBox() {
+        if (!dialogue) return;
+        const vw = canvas.width;
+        const vh = canvas.height;
+
+        const boxW = vw - 40;
+        const boxH = TEXTBOX_HEIGHT;
+        const x = 20;
+        const y = vh - boxH - 20;
+
+        // Background
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillRect(x, y, boxW, boxH);
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.strokeRect(x, y, boxW, boxH);
+
+        const currentLine = dialogue.lines[dialogue.index];
+        const text = currentLine.slice(0, dialogue.visibleChars);
+
+        ctx.fillStyle = "#f1f1f1";
+        ctx.font = "14px sans-serif";
+        const textX = x + 16;
+        let textY = y + 26;
+
+        // Simple manual wrapping: split by spaces
+        const words = text.split(" ");
+        let line = "";
+        const maxWidth = boxW - 32;
+        for (let i = 0; i < words.length; i++) {
+          const testLine = line + (line ? " " : "") + words[i];
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && line) {
+            ctx.fillText(line, textX, textY);
+            line = words[i];
+            textY += 18;
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) {
+          ctx.fillText(line, textX, textY);
+        }
+
+        // Arrow indicator when line finished
+        if (dialogue.doneLine) {
+          const arrowX = x + boxW - 26;
+          const arrowY = y + boxH - 16;
+          ctx.font = "16px sans-serif";
+          ctx.fillStyle = "#f4e38b";
+          ctx.fillText("▼", arrowX, arrowY);
+        }
+      }
+
+      function drawShopPanel() {
+        if (!shopOpen) return;
+        const vw = canvas.width;
+        const vh = canvas.height;
+
+        shopButtons = [];
+
+        // Dim background
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, 0, vw, vh);
+
+        const panelW = 420;
+        const panelH = 260;
+        const x = (vw - panelW) / 2;
+        const y = (vh - panelH) / 2;
+
+        ctx.fillStyle = "#181e2a";
+        ctx.fillRect(x, y, panelW, panelH);
+        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.strokeRect(x, y, panelW, panelH);
+
+        ctx.fillStyle = "#f1f1f1";
+        ctx.font = "18px sans-serif";
+        ctx.fillText("Merchant", x + 16, y + 26);
+
+        ctx.font = "12px sans-serif";
+        ctx.fillStyle = "#c5cde0";
+        ctx.fillText("Click buttons to buy/sell. Interact closes shop.", x + 16, y + 44);
+
+        // Seeds (top half)
+        ctx.fillStyle = "#101521";
+        ctx.fillRect(x + 12, y + 56, panelW - 24, 90);
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.strokeRect(x + 12, y + 56, panelW - 24, 90);
+        ctx.fillStyle = "#f1f1f1";
+        ctx.font = "13px sans-serif";
+        ctx.fillText("Buy Seeds", x + 20, y + 72);
+
+        let bx = x + 20;
+        let by = y + 82;
+        const itemBoxW = 120;
+        const itemBoxH = 54;
+
+        for (const t of cropTypes) {
+          ctx.fillStyle = "#181e2a";
+          ctx.fillRect(bx, by, itemBoxW, itemBoxH);
+          ctx.strokeStyle = "rgba(255,255,255,0.2)";
+          ctx.strokeRect(bx, by, itemBoxW, itemBoxH);
+
+          const iconColor = getCropColor(t.id, 0);
+          ctx.fillStyle = iconColor;
+          ctx.fillRect(bx + 8, by + 12, 20, 20);
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.strokeRect(bx + 8, by + 12, 20, 20);
+
+          ctx.fillStyle = "#f1f1f1";
+          ctx.font = "12px sans-serif";
+          ctx.fillText(t.name + " Seed", bx + 32, by + 20);
+          ctx.fillStyle = "#c5cde0";
+          ctx.font = "11px sans-serif";
+          ctx.fillText(t.seedPrice + "g", bx + 32, by + 34);
+
+          // Buy button
+          const btnW = 46;
+          const btnH = 20;
+          const btnX = bx + itemBoxW - btnW - 6;
+          const btnY = by + itemBoxH - btnH - 6;
+          ctx.fillStyle = "#2c7a4b";
+          ctx.fillRect(btnX, btnY, btnW, btnH);
+          ctx.strokeStyle = "#1f5835";
+          ctx.strokeRect(btnX, btnY, btnW, btnH);
+          ctx.fillStyle = "#f1f1f1";
+          ctx.font = "11px sans-serif";
+          ctx.fillText("Buy", btnX + 11, btnY + 14);
+
+          shopButtons.push({
+            action: "buy",
+            cropId: t.id,
+            x: btnX,
+            y: btnY,
+            w: btnW,
+            h: btnH
+          });
+
+          bx += itemBoxW + 10;
+        }
+
+        // Crops (bottom half)
+        const sellTop = y + 56 + 90 + 8;
+        ctx.fillStyle = "#101521";
+        ctx.fillRect(x + 12, sellTop, panelW - 24, 90);
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.strokeRect(x + 12, sellTop, panelW - 24, 90);
+        ctx.fillStyle = "#f1f1f1";
+        ctx.font = "13px sans-serif";
+        ctx.fillText("Sell Crops", x + 20, sellTop + 16);
+
+        bx = x + 20;
+        by = sellTop + 24;
+
+        for (const t of cropTypes) {
+          ctx.fillStyle = "#181e2a";
+          ctx.fillRect(bx, by, itemBoxW, itemBoxH);
+          ctx.strokeStyle = "rgba(255,255,255,0.2)";
+          ctx.strokeRect(bx, by, itemBoxW, itemBoxH);
+
+          const iconColor = getCropColor(t.id, 2);
+          ctx.fillStyle = iconColor;
+          ctx.fillRect(bx + 8, by + 12, 20, 20);
+          ctx.strokeStyle = "rgba(0,0,0,0.6)";
+          ctx.strokeRect(bx + 8, by + 12, 20, 20);
+
+          ctx.fillStyle = "#f1f1f1";
+          ctx.font = "12px sans-serif";
+          ctx.fillText(t.name, bx + 32, by + 20);
+          ctx.fillStyle = "#c5cde0";
+          ctx.font = "11px sans-serif";
+          ctx.fillText(t.cropPrice + "g each", bx + 32, by + 34);
+
+          // Sell 1 button
+          const btnW = 46;
+          const btnH = 20;
+          const btnX1 = bx + itemBoxW - btnW - 6;
+          const btnY1 = by + 4;
+          ctx.fillStyle = "#7a2c2c";
+          ctx.fillRect(btnX1, btnY1, btnW, btnH);
+          ctx.strokeStyle = "#5a1f1f";
+          ctx.strokeRect(btnX1, btnY1, btnW, btnH);
+          ctx.fillStyle = "#f1f1f1";
+          ctx.font = "10px sans-serif";
+          ctx.fillText("Sell 1", btnX1 + 7, btnY1 + 13);
+
+          shopButtons.push({
+            action: "sell1",
+            cropId: t.id,
+            x: btnX1,
+            y: btnY1,
+            w: btnW,
+            h: btnH
+          });
+
+          // Sell all button
+          const btnX2 = bx + itemBoxW - btnW - 6;
+          const btnY2 = by + itemBoxH - btnH - 6;
+          ctx.fillStyle = "#a33d3d";
+          ctx.fillRect(btnX2, btnY2, btnW, btnH);
+          ctx.strokeStyle = "#702929";
+          ctx.strokeRect(btnX2, btnY2, btnW, btnH);
+          ctx.fillStyle = "#f1f1f1";
+          ctx.font = "10px sans-serif";
+          ctx.fillText("All", btnX2 + 14, btnY2 + 13);
+
+          shopButtons.push({
+            action: "sellAll",
+            cropId: t.id,
+            x: btnX2,
+            y: btnY2,
+            w: btnW,
+            h: btnH
+          });
+
+          bx += itemBoxW + 10;
+        }
+      }
+
+      function draw() {
+        drawWorld();
+        drawNPC();
+        drawPlayer();
+        drawHUD();
+        if (shopOpen) drawShopPanel();
+        drawDialogueBox();
+      }
+
       // ====== MAIN UPDATE ======
       function update(dt) {
-        if (!shopOpen) {
+        if (!shopOpen && !dialogue) {
           handleMovement(dt);
-          handleActionInput();
         }
+        handleActionInput();
         updateCrops(dt);
-        updateMessages(dt);
+        updateDialogue(dt);
         updateCamera();
 
         const area = getAreaForPosition(player.x, player.y);
-        playBGMForArea(area);
+        playBgmForArea(area);
+
+        // area milestones (first enter town)
+        if (area !== lastArea) {
+          if (area === "town" && !milestones.firstEnterTown) {
+            milestones.firstEnterTown = true;
+            showTextBox([
+              "You arrive at a small town.",
+              "Maybe someone here buys crops..."
+            ]);
+          }
+          lastArea = area;
+        }
       }
 
       // ====== GAME LOOP ======
@@ -1120,9 +1295,10 @@
       }
 
       // ====== INIT ======
-      updateInventoryUI();
-      updateSeedSelectionUI();
-      showMessage("Farm on the left, town on the right. Follow the path and visit the merchant!");
+      showTextBox([
+        "Farm on the left, town on the right.",
+        "Plant seeds, harvest crops, and trade with the merchant."
+      ]);
 
       requestAnimationFrame(gameLoop);
     })();
