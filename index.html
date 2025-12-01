@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mini Farm V1.5</title>
+  <title>Mini Farm V2</title>
   <style>
     html, body {
       margin: 0;
@@ -70,6 +70,167 @@
       font-size: 12px;
       color: #c5cde0;
     }
+
+    .seed-choice {
+      margin: 2px 2px 2px 0;
+      padding: 3px 7px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid #3b4258;
+      background: #222738;
+      color: #f1f1f1;
+      cursor: pointer;
+    }
+
+    .seed-choice:hover {
+      background: #333a4c;
+    }
+
+    /* Overlays */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 10;
+    }
+
+    .start-window,
+    .shop-window {
+      background: #181e2a;
+      border-radius: 8px;
+      border: 1px solid #272f42;
+      padding: 16px 20px;
+      min-width: 260px;
+      max-width: 320px;
+      box-shadow: 0 0 18px rgba(0, 0, 0, 0.7);
+    }
+
+    .start-window h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 20px;
+    }
+
+    .shop-window h2 {
+      margin: 0 0 6px 0;
+      font-size: 18px;
+    }
+
+    .shop-window h3 {
+      margin: 8px 0 4px 0;
+      font-size: 14px;
+    }
+
+    .shop-section {
+      margin-top: 4px;
+      padding: 6px;
+      background: #101521;
+      border-radius: 4px;
+      border: 1px solid #272f42;
+    }
+
+    .shop-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .shop-row span:first-child {
+      flex: 1;
+    }
+
+    .shop-row span:nth-child(2) {
+      width: 50px;
+      text-align: right;
+    }
+
+    .menu-btn,
+    .shop-btn {
+      padding: 6px 10px;
+      background: #242b3d;
+      border-radius: 4px;
+      border: 1px solid #3b4258;
+      color: #f1f1f1;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .menu-btn {
+      width: 100%;
+      margin-top: 6px;
+    }
+
+    .menu-btn:first-of-type {
+      margin-top: 10px;
+    }
+
+    .menu-btn:hover,
+    .shop-btn:hover {
+      background: #343c52;
+    }
+
+    /* Mobile controls */
+    .hidden {
+      display: none !important;
+    }
+
+    #mobile-controls {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 9;
+    }
+
+    #mobile-dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 48px);
+      grid-template-rows: repeat(3, 48px);
+      gap: 4px;
+      justify-items: center;
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background: #242b3d;
+      border: 1px solid #3b4258;
+      color: #f1f1f1;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .ctrl-btn:active {
+      background: #3a435a;
+    }
+
+    .mobile-interact-btn {
+      position: fixed;
+      right: 16px;
+      bottom: 32px;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: #2c7a4b;
+      border: none;
+      color: #f1f1f1;
+      font-weight: bold;
+      font-size: 13px;
+      z-index: 9;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+    }
+
+    .mobile-interact-btn:active {
+      background: #3d915f;
+    }
   </style>
 </head>
 <body>
@@ -77,7 +238,7 @@
     <canvas id="game"></canvas>
 
     <div id="hud">
-      <h1>Mini Farm V1.5</h1>
+      <h1>Mini Farm V2</h1>
 
       <div class="section">
         <strong>Area:</strong> <span id="area-name">Farm</span>
@@ -86,8 +247,8 @@
       <div class="section">
         <strong>Controls</strong>
         <div class="controls-text">
-          Move: WASD / Arrow keys<br />
-          Action: Space (till / plant / harvest / talk to merchant)
+          Computer: WASD / Arrows, Space to interact<br />
+          Mobile: On-screen arrows + Interact button
         </div>
       </div>
 
@@ -97,11 +258,64 @@
       </div>
 
       <div class="section">
+        <strong>Seed Selection</strong>
+        <div id="seed-selection" class="controls-text"></div>
+      </div>
+
+      <div class="section">
         <strong>Inventory</strong>
         <div id="inventory"></div>
       </div>
     </div>
   </div>
+
+  <!-- Start screen -->
+  <div id="start-screen" class="overlay">
+    <div class="start-window">
+      <h1>Mini Farm</h1>
+      <p style="font-size:13px;">
+        Choose how you want to play:
+      </p>
+      <button id="choose-computer" class="menu-btn">Computer (Keyboard)</button>
+      <button id="choose-mobile" class="menu-btn">Mobile (Touch)</button>
+    </div>
+  </div>
+
+  <!-- Shop UI -->
+  <div id="shop-overlay" class="overlay hidden">
+    <div class="shop-window">
+      <h2>Merchant</h2>
+      <p style="font-size:13px;">Buy seeds and sell your crops.</p>
+
+      <div class="shop-section">
+        <h3>Buy Seeds</h3>
+        <div id="shop-buy-list"></div>
+      </div>
+
+      <div class="shop-section" style="margin-top:8px;">
+        <h3>Sell Crops</h3>
+        <div id="shop-sell-list"></div>
+      </div>
+
+      <button id="close-shop-btn" class="menu-btn" style="margin-top:10px;">Close</button>
+    </div>
+  </div>
+
+  <!-- Mobile controls -->
+  <div id="mobile-controls" class="hidden">
+    <div id="mobile-dpad">
+      <div></div>
+      <button id="btn-up" class="ctrl-btn">▲</button>
+      <div></div>
+      <button id="btn-left" class="ctrl-btn">◀</button>
+      <div></div>
+      <button id="btn-right" class="ctrl-btn">▶</button>
+      <div></div>
+      <button id="btn-down" class="ctrl-btn">▼</button>
+      <div></div>
+    </div>
+  </div>
+  <button id="btn-interact" class="mobile-interact-btn hidden">Interact</button>
 
   <script>
     (() => {
@@ -114,15 +328,56 @@
       const VIEWPORT_WIDTH = 640;
       const VIEWPORT_HEIGHT = 360;
 
-      const CROP_GROWTH_TIME = 12; // seconds to fully grown
-      const CROP_STAGES = 3;       // visual stages before "ready"
+      const CROP_STAGES = 3;
 
-      // Farm and town layout (in tile coordinates)
+      // Farm and town layout
       const FARM_BOUNDS = { xMin: 4, xMax: 28, yMin: 8, yMax: 32 };
       const TOWN_BOUNDS = { xMin: 38, xMax: 60, yMin: 8, yMax: 32 };
       const PATH_Y = Math.floor((FARM_BOUNDS.yMin + FARM_BOUNDS.yMax) / 2);
       const TOWN_CENTER_X = Math.floor((TOWN_BOUNDS.xMin + TOWN_BOUNDS.xMax) / 2);
       const TOWN_CENTER_Y = PATH_Y;
+
+      // Crop types
+      const cropTypes = [
+        {
+          id: "wheat",
+          name: "Wheat",
+          growthTime: 10,
+          seedPrice: 5,
+          cropPrice: 10
+        },
+        {
+          id: "carrot",
+          name: "Carrot",
+          growthTime: 14,
+          seedPrice: 8,
+          cropPrice: 16
+        },
+        {
+          id: "turnip",
+          name: "Turnip",
+          growthTime: 18,
+          seedPrice: 12,
+          cropPrice: 24
+        }
+      ];
+
+      const cropTypeById = {};
+      cropTypes.forEach(t => {
+        cropTypeById[t.id] = t;
+      });
+
+      const cropColors = {
+        wheat: ["#3aa655", "#c5c56e", "#f4e38b"],
+        carrot: ["#2f864c", "#f49a3c", "#f4b23a"],
+        turnip: ["#3c6b82", "#a78edb", "#f1d2ff"]
+      };
+
+      function getCropColor(cropId, stage) {
+        const colors = cropColors[cropId] || ["#3aa655", "#6cd96c", "#f4e38b"];
+        const idx = Math.max(0, Math.min(colors.length - 1, stage));
+        return colors[idx];
+      }
 
       // ====== DOM & CANVAS ======
       const canvas = document.getElementById("game");
@@ -130,12 +385,83 @@
       const messageBox = document.getElementById("message-box");
       const inventoryDiv = document.getElementById("inventory");
       const areaNameSpan = document.getElementById("area-name");
+      const seedSelectionDiv = document.getElementById("seed-selection");
+
+      const startScreen = document.getElementById("start-screen");
+      const chooseComputerBtn = document.getElementById("choose-computer");
+      const chooseMobileBtn = document.getElementById("choose-mobile");
+
+      const mobileControls = document.getElementById("mobile-controls");
+      const btnUp = document.getElementById("btn-up");
+      const btnDown = document.getElementById("btn-down");
+      const btnLeft = document.getElementById("btn-left");
+      const btnRight = document.getElementById("btn-right");
+      const interactButton = document.getElementById("btn-interact");
+
+      const shopOverlay = document.getElementById("shop-overlay");
+      const shopBuyList = document.getElementById("shop-buy-list");
+      const shopSellList = document.getElementById("shop-sell-list");
+      const closeShopBtn = document.getElementById("close-shop-btn");
 
       canvas.width = VIEWPORT_WIDTH;
       canvas.height = VIEWPORT_HEIGHT;
       ctx.imageSmoothingEnabled = false;
 
-      // ====== INPUT ======
+      // ====== CONTROL MODE ======
+      let controlMode = null; // "keyboard" | "mobile"
+      const mobileInput = { up: false, down: false, left: false, right: false };
+      let mobileInteractQueued = false;
+
+      chooseComputerBtn.addEventListener("click", () => {
+        controlMode = "keyboard";
+        startScreen.classList.add("hidden");
+      });
+
+      chooseMobileBtn.addEventListener("click", () => {
+        controlMode = "mobile";
+        startScreen.classList.add("hidden");
+        mobileControls.classList.remove("hidden");
+        interactButton.classList.remove("hidden");
+      });
+
+      function setupMobileControls() {
+        const attachDir = (btn, dir) => {
+          if (!btn) return;
+          const setDir = (value) => {
+            mobileInput[dir] = value;
+          };
+          ["pointerdown", "mousedown", "touchstart"].forEach(ev => {
+            btn.addEventListener(ev, (e) => {
+              e.preventDefault();
+              setDir(true);
+            });
+          });
+          ["pointerup", "mouseleave", "touchend", "touchcancel", "pointercancel"].forEach(ev => {
+            btn.addEventListener(ev, (e) => {
+              e.preventDefault();
+              setDir(false);
+            });
+          });
+        };
+
+        attachDir(btnUp, "up");
+        attachDir(btnDown, "down");
+        attachDir(btnLeft, "left");
+        attachDir(btnRight, "right");
+
+        if (interactButton) {
+          ["click", "pointerdown", "touchstart"].forEach(ev => {
+            interactButton.addEventListener(ev, (e) => {
+              e.preventDefault();
+              mobileInteractQueued = true;
+            });
+          });
+        }
+      }
+
+      setupMobileControls();
+
+      // ====== INPUT (Keyboard) ======
       const keys = {};
       window.addEventListener("keydown", (e) => {
         keys[e.code] = true;
@@ -161,21 +487,21 @@
         const row = [];
         for (let x = 0; x < WORLD_WIDTH; x++) {
           row.push({
-            type: TileType.TOWN_GRASS, // default base
-            crop: null                 // { age, stage }
+            type: TileType.TOWN_GRASS,
+            crop: null // { age, stage, cropId }
           });
         }
         world.push(row);
       }
 
-      // Farm area – lush green
+      // Farm area
       for (let y = FARM_BOUNDS.yMin; y <= FARM_BOUNDS.yMax; y++) {
         for (let x = FARM_BOUNDS.xMin; x <= FARM_BOUNDS.xMax; x++) {
           world[y][x].type = TileType.FARM_GRASS;
         }
       }
 
-      // Path between farm and town (slightly thick)
+      // Path between farm and town
       for (let x = FARM_BOUNDS.xMax - 1; x <= TOWN_BOUNDS.xMin + 1; x++) {
         if (x < 0 || x >= WORLD_WIDTH) continue;
         for (let yOff = -1; yOff <= 1; yOff++) {
@@ -186,7 +512,7 @@
         }
       }
 
-      // Town stone cross (grey paths)
+      // Town stone cross
       for (let x = TOWN_BOUNDS.xMin; x <= TOWN_BOUNDS.xMax; x++) {
         if (TOWN_CENTER_Y >= TOWN_BOUNDS.yMin && TOWN_CENTER_Y <= TOWN_BOUNDS.yMax) {
           world[TOWN_CENTER_Y][x].type = TileType.TOWN_STONE;
@@ -206,7 +532,7 @@
         y: playerStartY,
         width: 20,
         height: 24,
-        speed: 140 // pixels per second
+        speed: 140
       };
 
       const camera = {
@@ -214,10 +540,10 @@
         y: 0
       };
 
-      // ====== NPC (merchant in town) ======
+      // ====== NPC ======
       const npc = {
         tileX: TOWN_CENTER_X,
-        tileY: TOWN_CENTER_Y - 2 // just above the central cross
+        tileY: TOWN_CENTER_Y - 2
       };
 
       function isOnNPCTile(tileX, tileY) {
@@ -226,27 +552,68 @@
 
       // ====== INVENTORY ======
       const inventory = {
-        seeds: 5,
-        crops: 0,
-        money: 0
+        money: 0,
+        seeds: {},
+        crops: {}
       };
+
+      cropTypes.forEach((t, index) => {
+        inventory.seeds[t.id] = index === 0 ? 5 : 0; // start with some wheat seeds
+        inventory.crops[t.id] = 0;
+      });
+
+      let currentSeedTypeId = cropTypes[0].id;
 
       function updateInventoryUI() {
         if (!inventoryDiv) return;
+
+        const seedLines = cropTypes
+          .map(t => `<li>${t.name} seeds: ${inventory.seeds[t.id] || 0}</li>`)
+          .join("");
+        const cropLines = cropTypes
+          .map(t => `<li>${t.name}: ${inventory.crops[t.id] || 0}</li>`)
+          .join("");
+
         inventoryDiv.innerHTML = `
           <ul class="inventory-list">
-            <li>Seeds: ${inventory.seeds}</li>
-            <li>Crops: ${inventory.crops}</li>
-            <li>Money: ${inventory.money}g</li>
+            <li><strong>Money:</strong> ${inventory.money}g</li>
           </ul>
+          <div style="margin-top:4px;font-size:13px;">
+            <strong>Seeds</strong>
+            <ul class="inventory-list">${seedLines}</ul>
+            <strong>Crops</strong>
+            <ul class="inventory-list">${cropLines}</ul>
+          </div>
         `;
       }
 
+      function updateSeedSelectionUI() {
+        if (!seedSelectionDiv) return;
+        const html = cropTypes
+          .map(t => {
+            const selected = t.id === currentSeedTypeId;
+            return `<button class="seed-choice" data-id="${t.id}">${selected ? "★ " : ""}${t.name}</button>`;
+          })
+          .join(" ");
+        seedSelectionDiv.innerHTML = html;
+      }
+
+      seedSelectionDiv.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!target || !target.dataset || !target.dataset.id) return;
+        const id = target.dataset.id;
+        if (!cropTypeById[id]) return;
+        currentSeedTypeId = id;
+        updateSeedSelectionUI();
+        const t = cropTypeById[id];
+        showMessage(`Selected ${t.name} seeds.`);
+      });
+
       // ====== AUDIO ======
-      // Put these files next to this HTML:
-      //  - blip.wav        (small UI/text sound)
-      //  - bgm_farm.mp3    (farm + path)
-      //  - bgm_town.mp3    (town)
+      // Files next to index.html:
+      //  - blip.wav
+      //  - bgm_farm.mp3
+      //  - bgm_town.mp3
       const sounds = {
         blip: new Audio("blip.wav"),
         bgmFarm: new Audio("bgm_farm.mp3"),
@@ -288,13 +655,10 @@
           const blip = sounds.blip.cloneNode();
           blip.volume = 0.7;
           blip.play().catch(() => {});
-        } catch (err) {
-          // ignore audio errors
-        }
+        } catch (err) {}
       }
 
       function playBGMForArea(area) {
-        // HUD area label
         if (areaNameSpan) {
           let label = "Farm";
           if (area === "town") label = "Town";
@@ -333,25 +697,29 @@
         playBGMForArea(area);
       }
 
-      // Start audio only after user interacts (browser autoplay rules)
       window.addEventListener("keydown", () => initAudio(), { once: true });
       window.addEventListener("mousedown", () => initAudio(), { once: true });
+      window.addEventListener("touchstart", () => initAudio(), { once: true });
 
       // ====== CROPS ======
-      function plantCrop(tile) {
+      function plantCrop(tile, cropId) {
         tile.crop = {
           age: 0,
-          stage: 0
+          stage: 0,
+          cropId
         };
       }
 
       function updateCrops(dt) {
-        const perStage = CROP_GROWTH_TIME / (CROP_STAGES + 1);
         for (let y = 0; y < WORLD_HEIGHT; y++) {
           const row = world[y];
           for (let x = 0; x < WORLD_WIDTH; x++) {
             const tile = row[x];
             if (tile.crop) {
+              const type = cropTypeById[tile.crop.cropId];
+              const growthTime = type ? type.growthTime : 12;
+              const perStage = growthTime / (CROP_STAGES + 1);
+
               tile.crop.age += dt;
               tile.crop.stage = Math.min(
                 CROP_STAGES,
@@ -404,36 +772,119 @@
         );
       }
 
-      // ====== NPC INTERACTION ======
-      function interactWithNPC() {
-        const CROP_PRICE = 10;
-        const SEED_PRICE = 5;
+      // ====== SHOP ======
+      let shopOpen = false;
 
-        if (inventory.crops > 0) {
-          // Sell one crop
-          inventory.crops -= 1;
-          inventory.money += CROP_PRICE;
-          updateInventoryUI();
-          showMessage(`You sold 1 crop for ${CROP_PRICE}g.`);
-        } else if (inventory.money >= SEED_PRICE) {
-          // Buy one seed
-          inventory.money -= SEED_PRICE;
-          inventory.seeds += 1;
-          updateInventoryUI();
-          showMessage(`You bought 1 seed for ${SEED_PRICE}g.`);
-        } else {
-          showMessage("You need crops to sell or money to buy seeds.");
-        }
+      function buildShopUI() {
+        if (!shopBuyList || !shopSellList) return;
+
+        let buyHtml = "";
+        let sellHtml = "";
+
+        cropTypes.forEach(t => {
+          buyHtml += `
+            <div class="shop-row">
+              <span>${t.name} Seed</span>
+              <span>${t.seedPrice}g</span>
+              <button class="shop-btn" data-action="buy" data-id="${t.id}">Buy</button>
+            </div>
+          `;
+
+          sellHtml += `
+            <div class="shop-row">
+              <span>${t.name}</span>
+              <span>${t.cropPrice}g</span>
+              <button class="shop-btn" data-action="sell1" data-id="${t.id}">Sell 1</button>
+              <button class="shop-btn" data-action="sellAll" data-id="${t.id}">Sell All</button>
+            </div>
+          `;
+        });
+
+        shopBuyList.innerHTML = buyHtml;
+        shopSellList.innerHTML = sellHtml;
       }
 
-      // ====== INTERACTION (SPACEBAR) ======
+      function openShop() {
+        if (!shopOverlay) return;
+        shopOpen = true;
+        buildShopUI();
+        shopOverlay.classList.remove("hidden");
+        showMessage("Talking to the merchant...");
+      }
+
+      function closeShop() {
+        if (!shopOverlay) return;
+        shopOpen = false;
+        shopOverlay.classList.add("hidden");
+      }
+
+      if (closeShopBtn) {
+        closeShopBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          closeShop();
+        });
+      }
+
+      if (shopOverlay) {
+        shopOverlay.addEventListener("click", (e) => {
+          const target = e.target;
+          if (!target || !target.dataset) return;
+          const action = target.dataset.action;
+          const id = target.dataset.id;
+          if (!action || !id || !cropTypeById[id]) return;
+
+          const type = cropTypeById[id];
+
+          if (action === "buy") {
+            const price = type.seedPrice;
+            if (inventory.money >= price) {
+              inventory.money -= price;
+              inventory.seeds[id] = (inventory.seeds[id] || 0) + 1;
+              updateInventoryUI();
+              showMessage(`Bought 1 ${type.name} seed.`);
+            } else {
+              showMessage("Not enough money.");
+            }
+          } else if (action === "sell1") {
+            if (inventory.crops[id] > 0) {
+              inventory.crops[id] -= 1;
+              inventory.money += type.cropPrice;
+              updateInventoryUI();
+              showMessage(`Sold 1 ${type.name}.`);
+            } else {
+              showMessage(`You have no ${type.name} to sell.`);
+            }
+          } else if (action === "sellAll") {
+            const amount = inventory.crops[id];
+            if (amount > 0) {
+              inventory.crops[id] = 0;
+              inventory.money += type.cropPrice * amount;
+              updateInventoryUI();
+              showMessage(`Sold ${amount} ${type.name}(s).`);
+            } else {
+              showMessage(`You have no ${type.name} to sell.`);
+            }
+          }
+        });
+      }
+
+      // ====== INTERACTION (SPACE / MOBILE) ======
       let wasSpaceDown = false;
 
       function handleActionInput() {
         const spaceDown = !!keys["Space"];
-        if (spaceDown && !wasSpaceDown) {
+        const keyboardTriggered = spaceDown && !wasSpaceDown;
+
+        let mobileTriggered = false;
+        if (controlMode === "mobile" && mobileInteractQueued) {
+          mobileTriggered = true;
+          mobileInteractQueued = false;
+        }
+
+        if (keyboardTriggered || mobileTriggered) {
           interactWithTile();
         }
+
         wasSpaceDown = spaceDown;
       }
 
@@ -445,39 +896,46 @@
           return;
         }
 
-        // First: check for NPC interaction
+        // NPC interaction
         if (isOnNPCTile(tileX, tileY)) {
-          interactWithNPC();
+          if (!shopOpen) {
+            openShop();
+          }
           return;
         }
 
         const tile = world[tileY][tileX];
 
-        // If not in farm area, you can't do farming actions
+        // Farming only in farm area
         if (!isFarmTile(tileX, tileY)) {
           showMessage("You can't farm here.");
           return;
         }
 
-        // Farming actions
+        const currentType = cropTypeById[currentSeedTypeId];
+
         if (tile.type === TileType.FARM_GRASS) {
           tile.type = TileType.TILLED;
           showMessage("You tilled the soil.");
         } else {
-          if (!tile.crop && inventory.seeds > 0) {
-            plantCrop(tile);
-            inventory.seeds -= 1;
-            updateInventoryUI();
-            showMessage("You planted a seed.");
+          if (!tile.crop) {
+            if (inventory.seeds[currentSeedTypeId] > 0) {
+              plantCrop(tile, currentSeedTypeId);
+              inventory.seeds[currentSeedTypeId] -= 1;
+              updateInventoryUI();
+              showMessage(`You planted ${currentType.name}.`);
+            } else {
+              showMessage(`You have no ${currentType.name} seeds.`);
+            }
           } else if (tile.crop && tile.crop.stage >= CROP_STAGES) {
+            const harvestedId = tile.crop.cropId;
+            const harvestedType = cropTypeById[harvestedId];
             tile.crop = null;
-            inventory.crops += 1;
+            inventory.crops[harvestedId] = (inventory.crops[harvestedId] || 0) + 1;
             updateInventoryUI();
-            showMessage("You harvested a crop!");
+            showMessage(`You harvested ${harvestedType.name}!`);
           } else if (tile.crop) {
             showMessage("It's not ready yet...");
-          } else {
-            showMessage("You have no seeds.");
           }
         }
       }
@@ -487,10 +945,15 @@
         let dx = 0;
         let dy = 0;
 
-        if (keys["ArrowUp"] || keys["KeyW"]) dy -= 1;
-        if (keys["ArrowDown"] || keys["KeyS"]) dy += 1;
-        if (keys["ArrowLeft"] || keys["KeyA"]) dx -= 1;
-        if (keys["ArrowRight"] || keys["KeyD"]) dx += 1;
+        const up = keys["ArrowUp"] || keys["KeyW"] || (controlMode === "mobile" && mobileInput.up);
+        const down = keys["ArrowDown"] || keys["KeyS"] || (controlMode === "mobile" && mobileInput.down);
+        const left = keys["ArrowLeft"] || keys["KeyA"] || (controlMode === "mobile" && mobileInput.left);
+        const right = keys["ArrowRight"] || keys["KeyD"] || (controlMode === "mobile" && mobileInput.right);
+
+        if (up) dy -= 1;
+        if (down) dy += 1;
+        if (left) dx -= 1;
+        if (right) dx += 1;
 
         if (dx !== 0 || dy !== 0) {
           const length = Math.hypot(dx, dy) || 1;
@@ -528,7 +991,6 @@
 
       // ====== DRAWING ======
       function draw() {
-        // Clear
         ctx.fillStyle = "#1b1f2a";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -537,7 +999,7 @@
         const endTileX = Math.ceil((camera.x + VIEWPORT_WIDTH) / TILE_SIZE);
         const endTileY = Math.ceil((camera.y + VIEWPORT_HEIGHT) / TILE_SIZE);
 
-        // Tiles + crops
+        // Tiles & crops
         for (let y = startTileY; y < endTileY; y++) {
           if (y < 0 || y >= WORLD_HEIGHT) continue;
           for (let x = startTileX; x < endTileX; x++) {
@@ -547,7 +1009,7 @@
             const screenX = x * TILE_SIZE - camera.x;
             const screenY = y * TILE_SIZE - camera.y;
 
-            // Base tile color
+            // Base tile
             if (tile.type === TileType.FARM_GRASS) {
               const noise = ((x * 13 + y * 7) % 10) - 5;
               const baseG = 125 + noise;
@@ -555,34 +1017,28 @@
             } else if (tile.type === TileType.TILLED) {
               ctx.fillStyle = "#6b4a2f";
             } else if (tile.type === TileType.PATH) {
-              ctx.fillStyle = "#8b5a35"; // dirt path
+              ctx.fillStyle = "#8b5a35";
             } else if (tile.type === TileType.TOWN_GRASS) {
-              ctx.fillStyle = "#2a7f46"; // town-side green
+              ctx.fillStyle = "#2a7f46";
             } else if (tile.type === TileType.TOWN_STONE) {
-              ctx.fillStyle = "#7c828f"; // grey stone path
+              ctx.fillStyle = "#7c828f";
             } else {
-              ctx.fillStyle = "#333"; // fallback
+              ctx.fillStyle = "#333";
             }
 
             ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
-
-            // Tile border
             ctx.strokeStyle = "rgba(0,0,0,0.2)";
             ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
 
             // Crop
             if (tile.crop) {
               const stage = tile.crop.stage;
-              let cropColor = "#3aa655";
-              if (stage === 0) cropColor = "#3aa655";
-              else if (stage === 1) cropColor = "#6cd96c";
-              else if (stage >= CROP_STAGES) cropColor = "#f4e38b";
-
+              const color = getCropColor(tile.crop.cropId, stage);
               const size = 10 + stage * 4;
               const cx = screenX + TILE_SIZE / 2 - size / 2;
               const cy = screenY + TILE_SIZE / 2 - size / 2;
 
-              ctx.fillStyle = cropColor;
+              ctx.fillStyle = color;
               ctx.fillRect(cx, cy, size, size);
               ctx.strokeStyle = "rgba(0,0,0,0.5)";
               ctx.strokeRect(cx, cy, size, size);
@@ -590,17 +1046,17 @@
           }
         }
 
-        // NPC draw
+        // NPC
         const npcScreenX = npc.tileX * TILE_SIZE - camera.x;
         const npcScreenY = npc.tileY * TILE_SIZE - camera.y;
-        ctx.fillStyle = "#f2c089"; // body
+        ctx.fillStyle = "#f2c089";
         ctx.fillRect(
           npcScreenX + 8,
           npcScreenY + 6,
           TILE_SIZE - 16,
           TILE_SIZE - 12
         );
-        ctx.fillStyle = "#5a3a2a"; // hair/hat
+        ctx.fillStyle = "#5a3a2a";
         ctx.fillRect(
           npcScreenX + 8,
           npcScreenY + 2,
@@ -612,7 +1068,7 @@
         const playerScreenX = player.x - camera.x;
         const playerScreenY = player.y - camera.y;
 
-        ctx.fillStyle = "#f5d37b"; // body
+        ctx.fillStyle = "#f5d37b";
         ctx.fillRect(
           playerScreenX - player.width / 2,
           playerScreenY - player.height / 2,
@@ -620,7 +1076,7 @@
           player.height
         );
 
-        ctx.fillStyle = "#3b2d2a"; // hair/hat
+        ctx.fillStyle = "#3b2d2a";
         ctx.fillRect(
           playerScreenX - player.width / 2,
           playerScreenY - player.height / 2,
@@ -628,7 +1084,7 @@
           player.height / 3
         );
 
-        // Highlight current tile under player
+        // Highlight tile under player
         const tileX = Math.floor(player.x / TILE_SIZE);
         const tileY = Math.floor(player.y / TILE_SIZE);
         const highlightX = tileX * TILE_SIZE - camera.x;
@@ -639,8 +1095,10 @@
 
       // ====== MAIN UPDATE ======
       function update(dt) {
-        handleMovement(dt);
-        handleActionInput();
+        if (!shopOpen) {
+          handleMovement(dt);
+          handleActionInput();
+        }
         updateCrops(dt);
         updateMessages(dt);
         updateCamera();
@@ -663,6 +1121,7 @@
 
       // ====== INIT ======
       updateInventoryUI();
+      updateSeedSelectionUI();
       showMessage("Farm on the left, town on the right. Follow the path and visit the merchant!");
 
       requestAnimationFrame(gameLoop);
