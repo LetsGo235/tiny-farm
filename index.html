@@ -1,35 +1,533 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<title>Tiny Farm</title>
-	<style>
-		body {
-			margin: 0;
-			background: #111;
-			color: #fff;
-			font-family: sans-serif;
-			display: flex;
-		}
+  <meta charset="UTF-8" />
+  <title>Mini Farm V1</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #11151c;
+      color: #f1f1f1;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
 
-		#game-container {
-			margin: 16px;
-			position: relative;
-		}
+    #game-container {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+      gap: 16px;
+    }
 
-		canvas {
-			background: #223;
-			image-rendering: pixelated;
-			border: 2px solid #555;
-		}
-	</style>
+    #game {
+      border: 2px solid #3c445a;
+      background: #000;
+      image-rendering: pixelated;
+    }
+
+    #hud {
+      width: 260px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    #hud h1 {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+    }
+
+    .section {
+      margin-bottom: 12px;
+      padding: 8px;
+      background: #181e2a;
+      border-radius: 6px;
+      border: 1px solid #272f42;
+    }
+
+    #message-box {
+      min-height: 40px;
+      padding: 4px;
+      background: #101521;
+      border-radius: 4px;
+      border: 1px solid #2a3246;
+      font-size: 13px;
+    }
+
+    .inventory-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .inventory-list li {
+      margin-bottom: 2px;
+    }
+
+    .controls-text {
+      font-size: 12px;
+      color: #c5cde0;
+    }
+  </style>
 </head>
 <body>
-	<div id="game-container">
-		<canvas id="game" width="800" height="600"></canvas>
-	</div>
+  <div id="game-container">
+    <canvas id="game"></canvas>
 
-	<!-- Everything else is split into modules -->
-	<script type="module" src="./main.js"></script>
+    <div id="hud">
+      <h1>Mini Farm V1</h1>
+
+      <div class="section">
+        <strong>Area:</strong> <span id="area-name">Farm</span>
+      </div>
+
+      <div class="section">
+        <strong>Controls</strong>
+        <div class="controls-text">
+          Move: WASD / Arrow keys<br />
+          Action: Space (till / plant / harvest)
+        </div>
+      </div>
+
+      <div class="section">
+        <strong>Message</strong>
+        <div id="message-box"></div>
+      </div>
+
+      <div class="section">
+        <strong>Inventory</strong>
+        <div id="inventory"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      // ====== CONSTANTS ======
+      const TILE_SIZE = 32;
+      const WORLD_WIDTH = 80;   // tiles
+      const WORLD_HEIGHT = 80;  // tiles
+      const VIEWPORT_WIDTH = 640;
+      const VIEWPORT_HEIGHT = 360;
+
+      const CROP_GROWTH_TIME = 12; // seconds to fully grown
+      const CROP_STAGES = 3;       // visual stages before "ready"
+
+      // ====== DOM & CANVAS ======
+      const canvas = document.getElementById("game");
+      const ctx = canvas.getContext("2d");
+      const messageBox = document.getElementById("message-box");
+      const inventoryDiv = document.getElementById("inventory");
+      const areaNameSpan = document.getElementById("area-name");
+
+      canvas.width = VIEWPORT_WIDTH;
+      canvas.height = VIEWPORT_HEIGHT;
+      ctx.imageSmoothingEnabled = false;
+
+      // ====== INPUT ======
+      const keys = {};
+      window.addEventListener("keydown", (e) => {
+        keys[e.code] = true;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
+          e.preventDefault();
+        }
+      });
+      window.addEventListener("keyup", (e) => {
+        keys[e.code] = false;
+      });
+
+      // ====== WORLD SETUP ======
+      const TileType = {
+        GRASS: 0,
+        TILLED: 1
+      };
+
+      const world = [];
+      for (let y = 0; y < WORLD_HEIGHT; y++) {
+        const row = [];
+        for (let x = 0; x < WORLD_WIDTH; x++) {
+          row.push({
+            type: TileType.GRASS,
+            crop: null // { age, stage }
+          });
+        }
+        world.push(row);
+      }
+
+      // ====== PLAYER & CAMERA ======
+      const player = {
+        x: (WORLD_WIDTH * TILE_SIZE) / 2,
+        y: (WORLD_HEIGHT * TILE_SIZE) / 2,
+        width: 20,
+        height: 24,
+        speed: 140 // pixels per second
+      };
+
+      const camera = {
+        x: 0,
+        y: 0
+      };
+
+      // ====== INVENTORY ======
+      const inventory = {
+        seeds: 5,
+        crops: 0
+      };
+
+      function updateInventoryUI() {
+        if (!inventoryDiv) return;
+        inventoryDiv.innerHTML = `
+          <ul class="inventory-list">
+            <li>Seeds: ${inventory.seeds}</li>
+            <li>Crops: ${inventory.crops}</li>
+          </ul>
+        `;
+      }
+
+      // ====== AUDIO ======
+      // Put these files next to this HTML:
+      //  - blip.wav        (small UI/text sound)
+      //  - bgm_farm.mp3    (left side of map)
+      //  - bgm_forest.mp3  (right side of map)
+      const sounds = {
+        blip: new Audio("blip.wav"),
+        bgmFarm: new Audio("bgm_farm.mp3"),
+        bgmForest: new Audio("bgm_forest.mp3")
+      };
+
+      sounds.bgmFarm.loop = true;
+      sounds.bgmForest.loop = true;
+
+      let audioInitialized = false;
+      let currentArea = null;
+      let currentBGM = null;
+
+      function getAreaForPosition(x, y) {
+        const tileX = Math.floor(x / TILE_SIZE);
+        // Simple split: left half = farm, right half = forest
+        if (tileX < WORLD_WIDTH / 2) {
+          return "farm";
+        }
+        return "forest";
+      }
+
+      function playBlip() {
+        if (!audioInitialized) return;
+        if (!sounds.blip) return;
+        try {
+          const blip = sounds.blip.cloneNode();
+          blip.volume = 0.7;
+          blip.play().catch(() => {});
+        } catch (err) {
+          // ignore audio errors
+        }
+      }
+
+      function playBGMForArea(area) {
+        // Always update the area label
+        if (areaNameSpan) {
+          areaNameSpan.textContent = area.charAt(0).toUpperCase() + area.slice(1);
+        }
+
+        if (!audioInitialized) return;
+        if (currentArea === area) return;
+
+        currentArea = area;
+
+        if (currentBGM) {
+          currentBGM.pause();
+          currentBGM.currentTime = 0;
+        }
+
+        let bgm = null;
+        if (area === "farm") {
+          bgm = sounds.bgmFarm;
+        } else if (area === "forest") {
+          bgm = sounds.bgmForest;
+        }
+
+        currentBGM = bgm;
+        if (currentBGM) {
+          currentBGM.volume = 0.6;
+          currentBGM.play().catch(() => {});
+        }
+      }
+
+      function initAudio() {
+        if (audioInitialized) return;
+        audioInitialized = true;
+        const area = getAreaForPosition(player.x, player.y);
+        playBGMForArea(area);
+      }
+
+      // Start audio only after user interacts (browser autoplay rules)
+      window.addEventListener("keydown", () => initAudio(), { once: true });
+      window.addEventListener("mousedown", () => initAudio(), { once: true });
+
+      // ====== CROPS ======
+      function plantCrop(tile) {
+        tile.crop = {
+          age: 0,
+          stage: 0
+        };
+      }
+
+      function updateCrops(dt) {
+        const perStage = CROP_GROWTH_TIME / (CROP_STAGES + 1);
+        for (let y = 0; y < WORLD_HEIGHT; y++) {
+          const row = world[y];
+          for (let x = 0; x < WORLD_WIDTH; x++) {
+            const tile = row[x];
+            if (tile.crop) {
+              tile.crop.age += dt;
+              tile.crop.stage = Math.min(
+                CROP_STAGES,
+                Math.floor(tile.crop.age / perStage)
+              );
+            }
+          }
+        }
+      }
+
+      // ====== MESSAGES ======
+      let currentMessage = "";
+      let messageTimer = 0;
+      const MESSAGE_DURATION = 2.0;
+
+      function showMessage(text) {
+        currentMessage = text;
+        messageTimer = MESSAGE_DURATION;
+        if (messageBox) {
+          messageBox.textContent = text;
+        }
+        playBlip();
+      }
+
+      function updateMessages(dt) {
+        if (messageTimer > 0) {
+          messageTimer -= dt;
+          if (messageTimer <= 0) {
+            messageTimer = 0;
+            currentMessage = "";
+            if (messageBox) {
+              messageBox.textContent = "";
+            }
+          }
+        }
+      }
+
+      // ====== INTERACTION (SPACEBAR) ======
+      let wasSpaceDown = false;
+
+      function handleActionInput() {
+        const spaceDown = !!keys["Space"];
+        if (spaceDown && !wasSpaceDown) {
+          interactWithTile();
+        }
+        wasSpaceDown = spaceDown;
+      }
+
+      function interactWithTile() {
+        const tileX = Math.floor(player.x / TILE_SIZE);
+        const tileY = Math.floor(player.y / TILE_SIZE);
+
+        if (tileX < 0 || tileX >= WORLD_WIDTH || tileY < 0 || tileY >= WORLD_HEIGHT) {
+          return;
+        }
+
+        const tile = world[tileY][tileX];
+
+        // Contextual action on Space:
+        // 1) Grass -> till soil
+        // 2) Tilled & no crop & have seeds -> plant
+        // 3) Tilled & grown crop -> harvest
+        // 4) Tilled & growing -> "not ready"
+        // 5) Tilled & no crop & no seeds -> "no seeds"
+        if (tile.type === TileType.GRASS) {
+          tile.type = TileType.TILLED;
+          showMessage("You tilled the soil.");
+        } else {
+          if (!tile.crop && inventory.seeds > 0) {
+            plantCrop(tile);
+            inventory.seeds -= 1;
+            updateInventoryUI();
+            showMessage("You planted a seed.");
+          } else if (tile.crop && tile.crop.stage >= CROP_STAGES) {
+            tile.crop = null;
+            inventory.crops += 1;
+            updateInventoryUI();
+            showMessage("You harvested a crop!");
+          } else if (tile.crop) {
+            showMessage("It's not ready yet...");
+          } else {
+            showMessage("You have no seeds.");
+          }
+        }
+      }
+
+      // ====== MOVEMENT ======
+      function handleMovement(dt) {
+        let dx = 0;
+        let dy = 0;
+
+        if (keys["ArrowUp"] || keys["KeyW"]) dy -= 1;
+        if (keys["ArrowDown"] || keys["KeyS"]) dy += 1;
+        if (keys["ArrowLeft"] || keys["KeyA"]) dx -= 1;
+        if (keys["ArrowRight"] || keys["KeyD"]) dx += 1;
+
+        if (dx !== 0 || dy !== 0) {
+          const length = Math.hypot(dx, dy) || 1;
+          dx /= length;
+          dy /= length;
+
+          player.x += dx * player.speed * dt;
+          player.y += dy * player.speed * dt;
+
+          const minX = TILE_SIZE / 2;
+          const minY = TILE_SIZE / 2;
+          const maxX = WORLD_WIDTH * TILE_SIZE - TILE_SIZE / 2;
+          const maxY = WORLD_HEIGHT * TILE_SIZE - TILE_SIZE / 2;
+
+          if (player.x < minX) player.x = minX;
+          if (player.y < minY) player.y = minY;
+          if (player.x > maxX) player.x = maxX;
+          if (player.y > maxY) player.y = maxY;
+        }
+      }
+
+      // ====== CAMERA ======
+      function updateCamera() {
+        camera.x = player.x - VIEWPORT_WIDTH / 2;
+        camera.y = player.y - VIEWPORT_HEIGHT / 2;
+
+        const maxCamX = WORLD_WIDTH * TILE_SIZE - VIEWPORT_WIDTH;
+        const maxCamY = WORLD_HEIGHT * TILE_SIZE - VIEWPORT_HEIGHT;
+
+        if (camera.x < 0) camera.x = 0;
+        if (camera.y < 0) camera.y = 0;
+        if (camera.x > maxCamX) camera.x = maxCamX;
+        if (camera.y > maxCamY) camera.y = maxCamY;
+      }
+
+      // ====== DRAWING ======
+      function draw() {
+        // Clear
+        ctx.fillStyle = "#1b1f2a";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const startTileX = Math.floor(camera.x / TILE_SIZE);
+        const startTileY = Math.floor(camera.y / TILE_SIZE);
+        const endTileX = Math.ceil((camera.x + VIEWPORT_WIDTH) / TILE_SIZE);
+        const endTileY = Math.ceil((camera.y + VIEWPORT_HEIGHT) / TILE_SIZE);
+
+        // Tiles + crops
+        for (let y = startTileY; y < endTileY; y++) {
+          if (y < 0 || y >= WORLD_HEIGHT) continue;
+          for (let x = startTileX; x < endTileX; x++) {
+            if (x < 0 || x >= WORLD_WIDTH) continue;
+
+            const tile = world[y][x];
+            const screenX = x * TILE_SIZE - camera.x;
+            const screenY = y * TILE_SIZE - camera.y;
+
+            // Base tile
+            if (tile.type === TileType.GRASS) {
+              // Slight color variation by position so it doesn't look perfectly flat
+              const noise = ((x * 13 + y * 7) % 10) - 5;
+              const baseG = 125 + noise;
+              ctx.fillStyle = `rgb(45, ${baseG}, 70)`;
+            } else {
+              ctx.fillStyle = "#6b4a2f"; // tilled soil
+            }
+            ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+
+            // Tile border
+            ctx.strokeStyle = "rgba(0,0,0,0.2)";
+            ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+
+            // Crop
+            if (tile.crop) {
+              const stage = tile.crop.stage;
+              let cropColor = "#3aa655";
+              if (stage === 0) cropColor = "#3aa655";
+              else if (stage === 1) cropColor = "#6cd96c";
+              else if (stage >= CROP_STAGES) cropColor = "#f4e38b";
+
+              const size = 10 + stage * 4;
+              const cx = screenX + TILE_SIZE / 2 - size / 2;
+              const cy = screenY + TILE_SIZE / 2 - size / 2;
+
+              ctx.fillStyle = cropColor;
+              ctx.fillRect(cx, cy, size, size);
+              ctx.strokeStyle = "rgba(0,0,0,0.5)";
+              ctx.strokeRect(cx, cy, size, size);
+            }
+          }
+        }
+
+        // Player
+        const playerScreenX = player.x - camera.x;
+        const playerScreenY = player.y - camera.y;
+
+        ctx.fillStyle = "#f5d37b"; // body
+        ctx.fillRect(
+          playerScreenX - player.width / 2,
+          playerScreenY - player.height / 2,
+          player.width,
+          player.height
+        );
+
+        ctx.fillStyle = "#3b2d2a"; // hair/hat
+        ctx.fillRect(
+          playerScreenX - player.width / 2,
+          playerScreenY - player.height / 2,
+          player.width,
+          player.height / 3
+        );
+
+        // Highlight current tile under player
+        const tileX = Math.floor(player.x / TILE_SIZE);
+        const tileY = Math.floor(player.y / TILE_SIZE);
+        const highlightX = tileX * TILE_SIZE - camera.x;
+        const highlightY = tileY * TILE_SIZE - camera.y;
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.strokeRect(highlightX + 2, highlightY + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      }
+
+      // ====== MAIN UPDATE ======
+      function update(dt) {
+        handleMovement(dt);
+        handleActionInput();
+        updateCrops(dt);
+        updateMessages(dt);
+        updateCamera();
+
+        const area = getAreaForPosition(player.x, player.y);
+        playBGMForArea(area);
+      }
+
+      // ====== GAME LOOP ======
+      let lastTime = 0;
+      function gameLoop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const dt = (timestamp - lastTime) / 1000;
+        lastTime = timestamp;
+
+        update(dt);
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+
+      // ====== INIT ======
+      updateInventoryUI();
+      showMessage("Welcome to Mini Farm! Stand on a tile and press Space to till / plant / harvest.");
+
+      requestAnimationFrame(gameLoop);
+    })();
+  </script>
 </body>
 </html>
