@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mini Farm V3.1 (Hotbar System)</title>
+  <title>Mini Farm V4 (Day/Night + Sleep)</title>
   <style>
     html, body {
       margin: 0;
@@ -179,7 +179,11 @@
       const HOTBAR_SLOT_WIDTH = 64;
       const HOTBAR_SLOT_HEIGHT = 64;
       const HOTBAR_SLOT_GAP = 8;
-      const HOTBAR_SLOT_COUNT = 8; // more space to auto-add items
+      const HOTBAR_SLOT_COUNT = 8;
+
+      // Day/night time constants
+      const DAY_MINUTES = 24 * 60;
+      const MINUTES_PER_SECOND = 10; // how fast time goes (10 minutes per real second)
 
       // ============================================================
       //  CROP DEFINITIONS
@@ -201,6 +205,91 @@
         const colors = cropColors[cropId] || ["#3aa655", "#6cd96c", "#f4e38b"];
         const idx = Math.max(0, Math.min(colors.length - 1, stage));
         return colors[idx];
+      }
+
+      // ============================================================
+      //  TIME / DAY-NIGHT
+      // ============================================================
+      let timeMinutes = 6 * 60; // start at 06:00
+      let dayCount = 1;
+
+      function updateTime(dt) {
+        timeMinutes += dt * MINUTES_PER_SECOND;
+        if (timeMinutes >= DAY_MINUTES) {
+          const extraDays = Math.floor(timeMinutes / DAY_MINUTES);
+          dayCount += extraDays;
+          timeMinutes = timeMinutes % DAY_MINUTES;
+        }
+      }
+
+      function getTimeHM() {
+        const m = timeMinutes % DAY_MINUTES;
+        const hour = Math.floor(m / 60);
+        const minute = Math.floor(m % 60);
+        return { hour, minute };
+      }
+
+      function formatTime() {
+        const { hour, minute } = getTimeHM();
+        const hh = hour.toString().padStart(2, "0");
+        const mm = minute.toString().padStart(2, "0");
+        return `${hh}:${mm}`;
+      }
+
+      function getNightAlpha() {
+        const { hour, minute } = getTimeHM();
+        const h = hour + minute / 60;
+        let a = 0;
+
+        if (h < 5) {
+          a = 0.6; // deep night
+        } else if (h < 7) {
+          // dawn: fade from night 0.6 -> 0
+          const t = (h - 5) / 2;
+          a = 0.6 * (1 - t);
+        } else if (h < 18) {
+          a = 0; // full day
+        } else if (h < 21) {
+          // dusk: 0 -> 0.6
+          const t = (h - 18) / 3;
+          a = 0.6 * t;
+        } else {
+          a = 0.6; // night
+        }
+        return a;
+      }
+
+      function drawLightingOverlay() {
+        const alpha = getNightAlpha();
+        if (alpha <= 0) return;
+        ctx.fillStyle = `rgba(0, 0, 40, ${alpha})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      function canSleepNow() {
+        const { hour } = getTimeHM();
+        return hour >= 20 || hour < 6;
+      }
+
+      function sleepUntilMorning() {
+        const { hour, minute } = getTimeHM();
+        const currentInDay = hour * 60 + minute;
+        const target = 6 * 60; // 06:00
+
+        let diff;
+        if (currentInDay < target) {
+          diff = target - currentInDay;
+        } else {
+          diff = DAY_MINUTES - currentInDay + target;
+          dayCount += 1;
+        }
+
+        // Advance time
+        timeMinutes += diff;
+
+        // Advance crops according to skipped minutes
+        const dtEquivalent = diff / MINUTES_PER_SECOND;
+        updateCrops(dtEquivalent);
       }
 
       // ============================================================
@@ -301,7 +390,7 @@
       });
 
       // ============================================================
-      //  POINTER INPUT (CLICK/TAP) – Hotbar, Dialogue, Shop
+      //  POINTER INPUT
       // ============================================================
       function getCanvasPos(clientX, clientY) {
         const rect = canvas.getBoundingClientRect();
@@ -314,17 +403,14 @@
       }
 
       function handlePointerDown(x, y) {
-        // Dialogue click
         if (dialogue) {
           handleDialogueInteract();
           return;
         }
-        // Shop click
         if (shopOpen) {
           handleShopClick(x, y);
           return;
         }
-        // Hotbar click
         const slotIndex = hitTestHotbar(x, y);
         if (slotIndex !== -1) {
           selectHotbarSlot(slotIndex);
@@ -389,7 +475,7 @@
 
       // Town stone cross
       for (let x = TOWN_BOUNDS.xMin; x <= TOWN_BOUNDS.xMax; x++) {
-        if (TOWN_CENTER_Y >= TOWN_BOUNDS.yMin && TOWN_CENTER_Y <= TOWN_BOUNDS.yMax) {
+        if (TOWN_CENTER_Y >= TOWN_BOUNDS.yMin && TOWN_BOUNDS.yMax >= TOWN_CENTER_Y) {
           world[TOWN_CENTER_Y][x].type = TileType.TOWN_STONE;
         }
       }
@@ -414,7 +500,7 @@
       const camera = { x: 0, y: 0 };
 
       // ============================================================
-      //  NPC (Merchant)
+      //  NPC (Merchant) & BED
       // ============================================================
       const npc = {
         tileX: TOWN_CENTER_X,
@@ -424,17 +510,25 @@
         return tileX === npc.tileX && tileY === npc.tileY;
       }
 
+      // Simple bed near the top-left of the farm
+      const bed = {
+        tileX: FARM_BOUNDS.xMin + 2,
+        tileY: FARM_BOUNDS.yMin + 1
+      };
+      function isOnBedTile(tileX, tileY) {
+        return tileX === bed.tileX && tileY === bed.tileY;
+      }
+
       // ============================================================
-      //  INVENTORY & HOTBAR SYSTEM (MODULAR)
+      //  INVENTORY & HOTBAR
       // ============================================================
       const inventory = {
         money: 0,
-        seeds: {}, // { cropId: count }
-        crops: {}  // { cropId: count }
+        seeds: {},
+        crops: {}
       };
 
-      // hotbar slots hold items or null
-      // item = { category: "seed" | "crop", cropId: string }
+      // hotbar slots hold { category: "seed"|"crop", cropId } or null
       const hotbar = new Array(HOTBAR_SLOT_COUNT).fill(null);
       let hotbarRects = [];
       let selectedHotbarIndex = 0;
@@ -518,7 +612,7 @@
         return -1;
       }
 
-      // Start inventory: give some wheat seeds via the same system
+      // Start with some wheat seeds
       obtainItem("seed", "wheat", 5);
 
       // ============================================================
@@ -633,7 +727,7 @@
           visibleChars: 0,
           doneLine: false,
           time: 0,
-          speed: options.speed || 50, // chars per second
+          speed: options.speed || 50,
           onComplete: options.onComplete || null
         };
       }
@@ -686,7 +780,7 @@
       //  SHOP SYSTEM
       // ============================================================
       let shopOpen = false;
-      let shopButtons = []; // clickable regions this frame
+      let shopButtons = [];
 
       function openShop() {
         shopOpen = true;
@@ -748,7 +842,7 @@
           return false;
         }
         const tile = world[tileY][tileX];
-        return (tile.type === TileType.FARM_GRASS || tile.type === TileType.TILLED);
+        return tile.type === TileType.FARM_GRASS || tile.type === TileType.TILLED;
       }
 
       // ============================================================
@@ -793,6 +887,22 @@
         const tileY = Math.floor(player.y / TILE_SIZE);
         if (tileX < 0 || tileX >= WORLD_WIDTH || tileY < 0 || tileY >= WORLD_HEIGHT) return;
 
+        // Bed interaction (sleep)
+        if (isOnBedTile(tileX, tileY)) {
+          if (canSleepNow()) {
+            showTextBox(
+              [
+                "You lie down and close your eyes...",
+                "The night quietly passes."
+              ],
+              { onComplete: () => sleepUntilMorning() }
+            );
+          } else {
+            showTextBox(["It's too early to sleep."]);
+          }
+          return;
+        }
+
         // NPC interaction
         if (isOnNPCTile(tileX, tileY)) {
           showTextBox(
@@ -813,34 +923,9 @@
           return;
         }
 
-        const active = getActiveItem();
-        if (!active || active.category !== "seed") {
-          showTextBox(["Select seeds in your hotbar first."]);
-          return;
-        }
-
-        const seedCropId = active.cropId;
-        const seedType = cropTypeById[seedCropId];
-
-        if (tile.type === TileType.FARM_GRASS) {
-          tile.type = TileType.TILLED;
-        } else {
-          if (!tile.crop) {
-            const seedCount = inventory.seeds[seedCropId] || 0;
-            if (seedCount > 0) {
-              plantCrop(tile, seedCropId);
-              modifyItem("seed", seedCropId, -1);
-              if (!milestones.firstPlant) {
-                milestones.firstPlant = true;
-                showTextBox([
-                  "You planted your first " + seedType.name + "!",
-                  "Now wait for it to grow before harvesting."
-                ]);
-              }
-            } else {
-              showTextBox(["You have no " + seedType.name + " seeds."]);
-            }
-          } else if (tile.crop && tile.crop.stage >= CROP_STAGES) {
+        // --- BUGFIX: harvesting works even without seeds equipped ---
+        if (tile.crop) {
+          if (tile.crop.stage >= CROP_STAGES) {
             const harvestedId = tile.crop.cropId;
             const harvestedType = cropTypeById[harvestedId];
             tile.crop = null;
@@ -854,9 +939,44 @@
             } else {
               showTextBox(["You harvested " + harvestedType.name + "."]);
             }
-          } else if (tile.crop) {
+          } else {
             showTextBox(["It's not ready yet..."]);
           }
+          return;
+        }
+
+        // No crop here
+        if (tile.type === TileType.FARM_GRASS) {
+          // Till the soil
+          tile.type = TileType.TILLED;
+          return;
+        }
+
+        // TILLED but empty: plant seeds if selected
+        const active = getActiveItem();
+        if (!active || active.category !== "seed") {
+          showTextBox(["Select seeds in your hotbar first."]);
+          return;
+        }
+
+        const seedCropId = active.cropId;
+        const seedType = cropTypeById[seedCropId];
+        const seedCount = inventory.seeds[seedCropId] || 0;
+
+        if (seedCount <= 0) {
+          showTextBox(["You have no " + seedType.name + " seeds."]);
+          return;
+        }
+
+        plantCrop(tile, seedCropId);
+        modifyItem("seed", seedCropId, -1);
+
+        if (!milestones.firstPlant) {
+          milestones.firstPlant = true;
+          showTextBox([
+            "You planted your first " + seedType.name + "!",
+            "Now wait for it to grow before harvesting."
+          ]);
         }
       }
 
@@ -980,6 +1100,23 @@
         ctx.fillRect(screenX + 8, screenY + 2, TILE_SIZE - 16, 10);
       }
 
+      function drawBed() {
+        const screenX = bed.tileX * TILE_SIZE - camera.x;
+        const screenY = bed.tileY * TILE_SIZE - camera.y;
+
+        // Bed frame
+        ctx.fillStyle = "#c49a6c";
+        ctx.fillRect(screenX + 2, screenY + 10, TILE_SIZE - 4, TILE_SIZE - 6);
+
+        // Mattress
+        ctx.fillStyle = "#f2f2f2";
+        ctx.fillRect(screenX + 4, screenY + 4, TILE_SIZE - 8, TILE_SIZE / 2);
+
+        // Blanket
+        ctx.fillStyle = "#7aa0d8";
+        ctx.fillRect(screenX + 4, screenY + 16, TILE_SIZE - 8, TILE_SIZE / 2 - 4);
+      }
+
       function drawPlayer() {
         const screenX = player.x - camera.x;
         const screenY = player.y - camera.y;
@@ -1010,9 +1147,9 @@
         const vw = canvas.width;
         const vh = canvas.height;
 
-        // Area + money
-        const boxW = 160;
-        const boxH = 52;
+        // Area + time + day + money
+        const boxW = 190;
+        const boxH = 88;
         const pad = 12;
         ctx.fillStyle = "rgba(0,0,0,0.55)";
         ctx.fillRect(pad, pad, boxW, boxH);
@@ -1021,8 +1158,11 @@
 
         ctx.fillStyle = "#f1f1f1";
         ctx.font = "14px sans-serif";
-        ctx.fillText("Area: " + areaLabel(hudArea), pad + 8, pad + 20);
-        ctx.fillText("Money: " + inventory.money + "g", pad + 8, pad + 38);
+        const timeStr = formatTime();
+        ctx.fillText("Day: " + dayCount, pad + 8, pad + 18);
+        ctx.fillText("Time: " + timeStr, pad + 8, pad + 34);
+        ctx.fillText("Area: " + areaLabel(hudArea), pad + 8, pad + 50);
+        ctx.fillText("Money: " + inventory.money + "g", pad + 8, pad + 66);
 
         // Hotbar
         hotbarRects = [];
@@ -1081,7 +1221,7 @@
           ctx.textAlign = "left";
         }
 
-        // Controls hint
+        // Controls hint (top-right)
         ctx.fillStyle = "rgba(0,0,0,0.45)";
         const hintW = 190;
         const hintH = 40;
@@ -1309,8 +1449,10 @@
 
       function draw() {
         drawWorld();
+        drawBed();
         drawNPC();
         drawPlayer();
+        drawLightingOverlay();
         drawHUD();
         if (shopOpen) drawShopPanel();
         drawDialogueBox();
@@ -1320,6 +1462,8 @@
       //  MAIN UPDATE LOOP
       // ============================================================
       function update(dt) {
+        updateTime(dt);
+
         if (!shopOpen && !dialogue) {
           handleMovement(dt);
         }
@@ -1359,7 +1503,7 @@
       // ============================================================
       showTextBox([
         "Farm on the left, town on the right.",
-        "Plant seeds, harvest crops, and trade with the merchant."
+        "Plant seeds, harvest crops, sleep at your bed to skip the night."
       ]);
 
       requestAnimationFrame(gameLoop);
