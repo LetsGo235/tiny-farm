@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mini Farm V4 (Day/Night + Sleep)</title>
+  <title>Mini Farm V5 (Interiors)</title>
   <style>
     html, body {
       margin: 0;
@@ -181,9 +181,23 @@
       const HOTBAR_SLOT_GAP = 8;
       const HOTBAR_SLOT_COUNT = 8;
 
-      // Day/night time constants
+      // Day/night
       const DAY_MINUTES = 24 * 60;
-      const MINUTES_PER_SECOND = 10; // how fast time goes (10 minutes per real second)
+      const MINUTES_PER_SECOND = 10; // 10 in-game minutes per real second
+
+      // ============================================================
+      //  TILE TYPES (INCLUDING INTERIORS)
+      // ============================================================
+      const TileType = {
+        FARM_GRASS: 0,
+        TILLED: 1,
+        PATH: 2,
+        TOWN_GRASS: 3,
+        TOWN_STONE: 4,
+        INTERIOR_FLOOR: 5,
+        INTERIOR_WALL: 6,
+        INTERIOR_DOOR: 7
+      };
 
       // ============================================================
       //  CROP DEFINITIONS
@@ -210,7 +224,7 @@
       // ============================================================
       //  TIME / DAY-NIGHT
       // ============================================================
-      let timeMinutes = 6 * 60; // start at 06:00
+      let timeMinutes = 6 * 60; // 06:00 start
       let dayCount = 1;
 
       function updateTime(dt) {
@@ -242,19 +256,17 @@
         let a = 0;
 
         if (h < 5) {
-          a = 0.6; // deep night
+          a = 0.6;
         } else if (h < 7) {
-          // dawn: fade from night 0.6 -> 0
           const t = (h - 5) / 2;
           a = 0.6 * (1 - t);
         } else if (h < 18) {
-          a = 0; // full day
+          a = 0;
         } else if (h < 21) {
-          // dusk: 0 -> 0.6
           const t = (h - 18) / 3;
           a = 0.6 * t;
         } else {
-          a = 0.6; // night
+          a = 0.6;
         }
         return a;
       }
@@ -274,7 +286,7 @@
       function sleepUntilMorning() {
         const { hour, minute } = getTimeHM();
         const currentInDay = hour * 60 + minute;
-        const target = 6 * 60; // 06:00
+        const target = 6 * 60;
 
         let diff;
         if (currentInDay < target) {
@@ -284,10 +296,8 @@
           dayCount += 1;
         }
 
-        // Advance time
         timeMinutes += diff;
 
-        // Advance crops according to skipped minutes
         const dtEquivalent = diff / MINUTES_PER_SECOND;
         updateCrops(dtEquivalent);
       }
@@ -377,7 +387,6 @@
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) {
           e.preventDefault();
         }
-        // Hotbar keys 1–8
         if (e.code.startsWith("Digit")) {
           const n = parseInt(e.code.slice(5), 10);
           if (n >= 1 && n <= HOTBAR_SLOT_COUNT) {
@@ -433,23 +442,15 @@
       }, { passive: false });
 
       // ============================================================
-      //  WORLD SETUP
+      //  WORLD (OVERWORLD) SETUP
       // ============================================================
-      const TileType = {
-        FARM_GRASS: 0,
-        TILLED: 1,
-        PATH: 2,
-        TOWN_GRASS: 3,
-        TOWN_STONE: 4
-      };
-
       const world = [];
       for (let y = 0; y < WORLD_HEIGHT; y++) {
         const row = [];
         for (let x = 0; x < WORLD_WIDTH; x++) {
           row.push({
             type: TileType.TOWN_GRASS,
-            crop: null // { age, stage, cropId }
+            crop: null
           });
         }
         world.push(row);
@@ -484,6 +485,110 @@
       }
 
       // ============================================================
+      //  INTERIOR MAPS (MODULAR)
+      // ============================================================
+      const HOUSE1_WIDTH = 10;
+      const HOUSE1_HEIGHT = 8;
+
+      function createHouse1Map() {
+        const map = [];
+        for (let y = 0; y < HOUSE1_HEIGHT; y++) {
+          const row = [];
+          for (let x = 0; x < HOUSE1_WIDTH; x++) {
+            let type = TileType.INTERIOR_FLOOR;
+            if (y === 0 || y === HOUSE1_HEIGHT - 1 || x === 0 || x === HOUSE1_WIDTH - 1) {
+              type = TileType.INTERIOR_WALL;
+            }
+            row.push({ type, crop: null });
+          }
+          map.push(row);
+        }
+        const doorX = Math.floor(HOUSE1_WIDTH / 2);
+        const doorY = HOUSE1_HEIGHT - 1;
+        map[doorY][doorX].type = TileType.INTERIOR_DOOR;
+        return { map, doorX, doorY };
+      }
+
+      const { map: house1Map, doorX: house1DoorX, doorY: house1DoorY } = createHouse1Map();
+
+      // ============================================================
+      //  SCENES & DOORS (MODULAR)
+      // ============================================================
+      const SceneId = {
+        OVERWORLD: "overworld",
+        HOUSE_TOWN1: "house_town1"
+      };
+
+      const scenes = {
+        [SceneId.OVERWORLD]: {
+          id: SceneId.OVERWORLD,
+          type: "overworld",
+          width: WORLD_WIDTH,
+          height: WORLD_HEIGHT,
+          tiles: world
+        },
+        [SceneId.HOUSE_TOWN1]: {
+          id: SceneId.HOUSE_TOWN1,
+          type: "interior",
+          width: HOUSE1_WIDTH,
+          height: HOUSE1_HEIGHT,
+          tiles: house1Map
+        }
+      };
+
+      let currentSceneId = SceneId.OVERWORLD;
+
+      function getCurrentScene() {
+        return scenes[currentSceneId];
+      }
+
+      // External house door in town (right of NPC)
+      const house1ExteriorDoor = {
+        tileX: TOWN_CENTER_X + 3,
+        tileY: TOWN_CENTER_Y
+      };
+
+      // Door links (enter/exit)
+      const doorLinks = [
+        {
+          fromScene: SceneId.OVERWORLD,
+          fromTileX: house1ExteriorDoor.tileX,
+          fromTileY: house1ExteriorDoor.tileY,
+          toScene: SceneId.HOUSE_TOWN1,
+          toTileX: Math.floor(HOUSE1_WIDTH / 2),
+          toTileY: HOUSE1_HEIGHT - 2 // just inside the door
+        },
+        {
+          fromScene: SceneId.HOUSE_TOWN1,
+          fromTileX: house1DoorX,
+          fromTileY: house1DoorY,
+          toScene: SceneId.OVERWORLD,
+          toTileX: house1ExteriorDoor.tileX,
+          toTileY: house1ExteriorDoor.tileY
+        }
+      ];
+
+      function findDoorAt(tileX, tileY) {
+        for (const d of doorLinks) {
+          if (d.fromScene === currentSceneId &&
+              d.fromTileX === tileX &&
+              d.fromTileY === tileY) {
+            return d;
+          }
+        }
+        return null;
+      }
+
+      function switchScene(sceneId, tileX, tileY) {
+        const scene = scenes[sceneId];
+        if (!scene) return;
+        currentSceneId = sceneId;
+        player.x = tileX * TILE_SIZE + TILE_SIZE / 2;
+        player.y = tileY * TILE_SIZE + TILE_SIZE / 2;
+        updateCamera();
+      }
+
+      // ============================================================
       //  PLAYER & CAMERA
       // ============================================================
       const playerStartX = ((FARM_BOUNDS.xMin + FARM_BOUNDS.xMax) / 2) * TILE_SIZE + TILE_SIZE / 2;
@@ -499,24 +604,30 @@
 
       const camera = { x: 0, y: 0 };
 
+      function getSceneSize() {
+        const s = getCurrentScene();
+        return { width: s.width, height: s.height };
+      }
+
       // ============================================================
-      //  NPC (Merchant) & BED
+      //  NPC (Merchant) & BED (OVERWORLD)
       // ============================================================
       const npc = {
         tileX: TOWN_CENTER_X,
         tileY: TOWN_CENTER_Y - 2
       };
       function isOnNPCTile(tileX, tileY) {
-        return tileX === npc.tileX && tileY === npc.tileY;
+        return currentSceneId === SceneId.OVERWORLD &&
+               tileX === npc.tileX && tileY === npc.tileY;
       }
 
-      // Simple bed near the top-left of the farm
       const bed = {
         tileX: FARM_BOUNDS.xMin + 2,
         tileY: FARM_BOUNDS.yMin + 1
       };
       function isOnBedTile(tileX, tileY) {
-        return tileX === bed.tileX && tileY === bed.tileY;
+        return currentSceneId === SceneId.OVERWORLD &&
+               tileX === bed.tileX && tileY === bed.tileY;
       }
 
       // ============================================================
@@ -528,7 +639,6 @@
         crops: {}
       };
 
-      // hotbar slots hold { category: "seed"|"crop", cropId } or null
       const hotbar = new Array(HOTBAR_SLOT_COUNT).fill(null);
       let hotbarRects = [];
       let selectedHotbarIndex = 0;
@@ -632,6 +742,9 @@
       let lastArea = null;
 
       function getAreaForPosition(x, y) {
+        const scene = getCurrentScene();
+        if (scene.type === "interior") return "interior";
+
         const tileX = Math.floor(x / TILE_SIZE);
         const tileY = Math.floor(y / TILE_SIZE);
         if (tileX >= FARM_BOUNDS.xMin && tileX <= FARM_BOUNDS.xMax &&
@@ -648,6 +761,7 @@
       function areaLabel(area) {
         if (area === "town") return "Town";
         if (area === "path") return "Path";
+        if (area === "interior") return "House";
         return "Farm";
       }
 
@@ -664,16 +778,19 @@
       function playBgmForArea(area) {
         hudArea = area;
         if (!audioInitialized) return;
-        if (currentBgmArea === area) return;
-        currentBgmArea = area;
+
+        // Group farm/path/interior as "farm" music, town as town music
+        const musicArea = (area === "town") ? "town" : "farm";
+        if (currentBgmArea === musicArea) return;
+        currentBgmArea = musicArea;
 
         if (sounds.bgmFarm) { sounds.bgmFarm.pause(); sounds.bgmFarm.currentTime = 0; }
         if (sounds.bgmTown) { sounds.bgmTown.pause(); sounds.bgmTown.currentTime = 0; }
 
-        if (area === "farm" || area === "path") {
+        if (musicArea === "farm") {
           sounds.bgmFarm.volume = 0.6;
           sounds.bgmFarm.play().catch(() => {});
-        } else if (area === "town") {
+        } else {
           sounds.bgmTown.volume = 0.6;
           sounds.bgmTown.play().catch(() => {});
         }
@@ -691,13 +808,14 @@
       window.addEventListener("touchstart", () => initAudio(), { once: true });
 
       // ============================================================
-      //  PLANTING / CROP SYSTEM
+      //  PLANTING / CROP SYSTEM (OVERWORLD)
       // ============================================================
       function plantCrop(tile, cropId) {
         tile.crop = { age: 0, stage: 0, cropId };
       }
 
       function updateCrops(dt) {
+        // Crops only exist in overworld
         for (let y = 0; y < WORLD_HEIGHT; y++) {
           const row = world[y];
           for (let x = 0; x < WORLD_WIDTH; x++) {
@@ -716,9 +834,9 @@
       }
 
       // ============================================================
-      //  DIALOGUE / TEXTBOX (TYPEWRITER)
+      //  DIALOGUE / TEXTBOX
       // ============================================================
-      let dialogue = null; // { lines, index, visibleChars, doneLine, time, speed, onComplete }
+      let dialogue = null;
 
       function showTextBox(lines, options = {}) {
         dialogue = {
@@ -834,7 +952,7 @@
       }
 
       // ============================================================
-      //  FARM HELPERS
+      //  FARM HELPERS (OVERWORLD)
       // ============================================================
       function isFarmTile(tileX, tileY) {
         if (tileX < FARM_BOUNDS.xMin || tileX > FARM_BOUNDS.xMax ||
@@ -846,7 +964,7 @@
       }
 
       // ============================================================
-      //  INTERACTION (SPACE / MOBILE)
+      //  INTERACTION
       // ============================================================
       let wasSpaceDown = false;
 
@@ -883,11 +1001,19 @@
       }
 
       function interactWithWorld() {
+        const scene = getCurrentScene();
         const tileX = Math.floor(player.x / TILE_SIZE);
         const tileY = Math.floor(player.y / TILE_SIZE);
-        if (tileX < 0 || tileX >= WORLD_WIDTH || tileY < 0 || tileY >= WORLD_HEIGHT) return;
+        if (tileX < 0 || tileX >= scene.width || tileY < 0 || tileY >= scene.height) return;
 
-        // Bed interaction (sleep)
+        // Doors (works for overworld & interiors)
+        const door = findDoorAt(tileX, tileY);
+        if (door) {
+          switchScene(door.toScene, door.toTileX, door.toTileY);
+          return;
+        }
+
+        // Bed (overworld only)
         if (isOnBedTile(tileX, tileY)) {
           if (canSleepNow()) {
             showTextBox(
@@ -903,81 +1029,85 @@
           return;
         }
 
-        // NPC interaction
-        if (isOnNPCTile(tileX, tileY)) {
-          showTextBox(
-            [
-              "Hey there! I buy crops and sell seeds.",
-              "Grow good stuff and I'll make it worth your while."
-            ],
-            { onComplete: () => openShop() }
-          );
-          return;
-        }
+        // NPC & farming only in overworld
+        if (currentSceneId === SceneId.OVERWORLD) {
+          if (isOnNPCTile(tileX, tileY)) {
+            showTextBox(
+              [
+                "Hey there! I buy crops and sell seeds.",
+                "Grow good stuff and I'll make it worth your while."
+              ],
+              { onComplete: () => openShop() }
+            );
+            return;
+          }
 
-        const tile = world[tileY][tileX];
+          const tile = world[tileY][tileX];
 
-        // Only farm in farm area
-        if (!isFarmTile(tileX, tileY)) {
-          showTextBox(["You can't farm here."]);
-          return;
-        }
+          if (!isFarmTile(tileX, tileY)) {
+            showTextBox(["You can't farm here."]);
+            return;
+          }
 
-        // --- BUGFIX: harvesting works even without seeds equipped ---
-        if (tile.crop) {
-          if (tile.crop.stage >= CROP_STAGES) {
-            const harvestedId = tile.crop.cropId;
-            const harvestedType = cropTypeById[harvestedId];
-            tile.crop = null;
-            obtainItem("crop", harvestedId, 1);
-            if (!milestones.firstHarvest) {
-              milestones.firstHarvest = true;
-              showTextBox([
-                "You harvested your first " + harvestedType.name + "!",
-                "Take it to town and sell it to the merchant."
-              ]);
+          // Harvest or check growth
+          if (tile.crop) {
+            if (tile.crop.stage >= CROP_STAGES) {
+              const harvestedId = tile.crop.cropId;
+              const harvestedType = cropTypeById[harvestedId];
+              tile.crop = null;
+              obtainItem("crop", harvestedId, 1);
+              if (!milestones.firstHarvest) {
+                milestones.firstHarvest = true;
+                showTextBox([
+                  "You harvested your first " + harvestedType.name + "!",
+                  "Take it to town and sell it to the merchant."
+                ]);
+              } else {
+                showTextBox(["You harvested " + harvestedType.name + "."]);
+              }
             } else {
-              showTextBox(["You harvested " + harvestedType.name + "."]);
+              showTextBox(["It's not ready yet..."]);
             }
-          } else {
-            showTextBox(["It's not ready yet..."]);
+            return;
+          }
+
+          // No crop here
+          if (tile.type === TileType.FARM_GRASS) {
+            tile.type = TileType.TILLED;
+            return;
+          }
+
+          // TILLED, empty: plant if seeds selected
+          const active = getActiveItem();
+          if (!active || active.category !== "seed") {
+            showTextBox(["Select seeds in your hotbar first."]);
+            return;
+          }
+
+          const seedCropId = active.cropId;
+          const seedType = cropTypeById[seedCropId];
+          const seedCount = inventory.seeds[seedCropId] || 0;
+
+          if (seedCount <= 0) {
+            showTextBox(["You have no " + seedType.name + " seeds."]);
+            return;
+          }
+
+          plantCrop(tile, seedCropId);
+          modifyItem("seed", seedCropId, -1);
+
+          if (!milestones.firstPlant) {
+            milestones.firstPlant = true;
+            showTextBox([
+              "You planted your first " + seedType.name + "!",
+              "Now wait for it to grow before harvesting."
+            ]);
           }
           return;
         }
 
-        // No crop here
-        if (tile.type === TileType.FARM_GRASS) {
-          // Till the soil
-          tile.type = TileType.TILLED;
-          return;
-        }
-
-        // TILLED but empty: plant seeds if selected
-        const active = getActiveItem();
-        if (!active || active.category !== "seed") {
-          showTextBox(["Select seeds in your hotbar first."]);
-          return;
-        }
-
-        const seedCropId = active.cropId;
-        const seedType = cropTypeById[seedCropId];
-        const seedCount = inventory.seeds[seedCropId] || 0;
-
-        if (seedCount <= 0) {
-          showTextBox(["You have no " + seedType.name + " seeds."]);
-          return;
-        }
-
-        plantCrop(tile, seedCropId);
-        modifyItem("seed", seedCropId, -1);
-
-        if (!milestones.firstPlant) {
-          milestones.firstPlant = true;
-          showTextBox([
-            "You planted your first " + seedType.name + "!",
-            "Now wait for it to grow before harvesting."
-          ]);
-        }
+        // Interiors: nothing special yet besides doors
+        showTextBox(["A cozy room."]);
       }
 
       // ============================================================
@@ -1005,10 +1135,11 @@
           player.x += dx * player.speed * dt;
           player.y += dy * player.speed * dt;
 
+          const { width, height } = getSceneSize();
           const minX = TILE_SIZE / 2;
           const minY = TILE_SIZE / 2;
-          const maxX = WORLD_WIDTH * TILE_SIZE - TILE_SIZE / 2;
-          const maxY = WORLD_HEIGHT * TILE_SIZE - TILE_SIZE / 2;
+          const maxX = width * TILE_SIZE - TILE_SIZE / 2;
+          const maxY = height * TILE_SIZE - TILE_SIZE / 2;
 
           if (player.x < minX) player.x = minX;
           if (player.y < minY) player.y = minY;
@@ -1023,8 +1154,9 @@
         camera.x = player.x - vw / 2;
         camera.y = player.y - vh / 2;
 
-        const maxCamX = WORLD_WIDTH * TILE_SIZE - vw;
-        const maxCamY = WORLD_HEIGHT * TILE_SIZE - vh;
+        const { width, height } = getSceneSize();
+        const maxCamX = width * TILE_SIZE - vw;
+        const maxCamY = height * TILE_SIZE - vh;
 
         if (camera.x < 0) camera.x = 0;
         if (camera.y < 0) camera.y = 0;
@@ -1042,34 +1174,55 @@
         ctx.fillStyle = "#1b1f2a";
         ctx.fillRect(0, 0, vw, vh);
 
+        const scene = getCurrentScene();
+        const tiles = scene.tiles;
+        const width = scene.width;
+        const height = scene.height;
+
         const startTileX = Math.floor(camera.x / TILE_SIZE);
         const startTileY = Math.floor(camera.y / TILE_SIZE);
         const endTileX = Math.ceil((camera.x + vw) / TILE_SIZE);
         const endTileY = Math.ceil((camera.y + vh) / TILE_SIZE);
 
         for (let y = startTileY; y < endTileY; y++) {
-          if (y < 0 || y >= WORLD_HEIGHT) continue;
+          if (y < 0 || y >= height) continue;
           for (let x = startTileX; x < endTileX; x++) {
-            if (x < 0 || x >= WORLD_WIDTH) continue;
+            if (x < 0 || x >= width) continue;
 
-            const tile = world[y][x];
+            const tile = tiles[y][x];
             const screenX = x * TILE_SIZE - camera.x;
             const screenY = y * TILE_SIZE - camera.y;
 
-            if (tile.type === TileType.FARM_GRASS) {
-              const noise = ((x * 13 + y * 7) % 10) - 5;
-              const baseG = 125 + noise;
-              ctx.fillStyle = `rgb(45, ${baseG}, 70)`;
-            } else if (tile.type === TileType.TILLED) {
-              ctx.fillStyle = "#6b4a2f";
-            } else if (tile.type === TileType.PATH) {
-              ctx.fillStyle = "#8b5a35";
-            } else if (tile.type === TileType.TOWN_GRASS) {
-              ctx.fillStyle = "#2a7f46";
-            } else if (tile.type === TileType.TOWN_STONE) {
-              ctx.fillStyle = "#7c828f";
-            } else {
-              ctx.fillStyle = "#333";
+            switch (tile.type) {
+              case TileType.FARM_GRASS: {
+                const noise = ((x * 13 + y * 7) % 10) - 5;
+                const baseG = 125 + noise;
+                ctx.fillStyle = `rgb(45, ${baseG}, 70)`;
+                break;
+              }
+              case TileType.TILLED:
+                ctx.fillStyle = "#6b4a2f";
+                break;
+              case TileType.PATH:
+                ctx.fillStyle = "#8b5a35";
+                break;
+              case TileType.TOWN_GRASS:
+                ctx.fillStyle = "#2a7f46";
+                break;
+              case TileType.TOWN_STONE:
+                ctx.fillStyle = "#7c828f";
+                break;
+              case TileType.INTERIOR_FLOOR:
+                ctx.fillStyle = "#3b3a4a";
+                break;
+              case TileType.INTERIOR_WALL:
+                ctx.fillStyle = "#5d5568";
+                break;
+              case TileType.INTERIOR_DOOR:
+                ctx.fillStyle = "#c49a6c";
+                break;
+              default:
+                ctx.fillStyle = "#333";
             }
 
             ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
@@ -1092,6 +1245,7 @@
       }
 
       function drawNPC() {
+        if (currentSceneId !== SceneId.OVERWORLD) return;
         const screenX = npc.tileX * TILE_SIZE - camera.x;
         const screenY = npc.tileY * TILE_SIZE - camera.y;
         ctx.fillStyle = "#f2c089";
@@ -1101,20 +1255,31 @@
       }
 
       function drawBed() {
+        if (currentSceneId !== SceneId.OVERWORLD) return;
         const screenX = bed.tileX * TILE_SIZE - camera.x;
         const screenY = bed.tileY * TILE_SIZE - camera.y;
-
-        // Bed frame
         ctx.fillStyle = "#c49a6c";
         ctx.fillRect(screenX + 2, screenY + 10, TILE_SIZE - 4, TILE_SIZE - 6);
-
-        // Mattress
         ctx.fillStyle = "#f2f2f2";
         ctx.fillRect(screenX + 4, screenY + 4, TILE_SIZE - 8, TILE_SIZE / 2);
-
-        // Blanket
         ctx.fillStyle = "#7aa0d8";
         ctx.fillRect(screenX + 4, screenY + 16, TILE_SIZE - 8, TILE_SIZE / 2 - 4);
+      }
+
+      function drawHouseExteriors() {
+        if (currentSceneId !== SceneId.OVERWORLD) return;
+        const hx = house1ExteriorDoor.tileX * TILE_SIZE - camera.x;
+        const hy = house1ExteriorDoor.tileY * TILE_SIZE - camera.y;
+
+        // Simple little house shape anchored on the door tile
+        ctx.fillStyle = "#aa7d4f"; // wall
+        ctx.fillRect(hx - TILE_SIZE, hy - TILE_SIZE * 2, TILE_SIZE * 3, TILE_SIZE * 2);
+        ctx.fillStyle = "#653b2a"; // roof
+        ctx.fillRect(hx - TILE_SIZE - 2, hy - TILE_SIZE * 2 - 10, TILE_SIZE * 3 + 4, 12);
+
+        // Door highlight on the actual door tile
+        ctx.strokeStyle = "#f4e38b";
+        ctx.strokeRect(hx + 6, hy + 4, TILE_SIZE - 12, TILE_SIZE - 8);
       }
 
       function drawPlayer() {
@@ -1147,7 +1312,6 @@
         const vw = canvas.width;
         const vh = canvas.height;
 
-        // Area + time + day + money
         const boxW = 190;
         const boxH = 88;
         const pad = 12;
@@ -1221,7 +1385,7 @@
           ctx.textAlign = "left";
         }
 
-        // Controls hint (top-right)
+        // Controls hint
         ctx.fillStyle = "rgba(0,0,0,0.45)";
         const hintW = 190;
         const hintH = 40;
@@ -1450,6 +1614,7 @@
       function draw() {
         drawWorld();
         drawBed();
+        drawHouseExteriors();
         drawNPC();
         drawPlayer();
         drawLightingOverlay();
@@ -1503,7 +1668,8 @@
       // ============================================================
       showTextBox([
         "Farm on the left, town on the right.",
-        "Plant seeds, harvest crops, sleep at your bed to skip the night."
+        "There's a house in town you can enter now.",
+        "Plant seeds, harvest crops, sleep, and explore."
       ]);
 
       requestAnimationFrame(gameLoop);
