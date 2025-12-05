@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mini Farm V5 (Interiors)</title>
+  <title>Mini Farm V6a (Merchant Schedule)</title>
   <style>
     html, body {
       margin: 0;
@@ -250,6 +250,11 @@
         return `${hh}:${mm}`;
       }
 
+      function isNight() {
+        const { hour } = getTimeHM();
+        return hour >= 20 || hour < 6;
+      }
+
       function getNightAlpha() {
         const { hour, minute } = getTimeHM();
         const h = hour + minute / 60;
@@ -279,8 +284,7 @@
       }
 
       function canSleepNow() {
-        const { hour } = getTimeHM();
-        return hour >= 20 || hour < 6;
+        return isNight();
       }
 
       function sleepUntilMorning() {
@@ -542,7 +546,7 @@
         return scenes[currentSceneId];
       }
 
-      // External house door in town (right of NPC)
+      // External house door in town (right of merchant stall)
       const house1ExteriorDoor = {
         tileX: TOWN_CENTER_X + 3,
         tileY: TOWN_CENTER_Y
@@ -610,15 +614,37 @@
       }
 
       // ============================================================
-      //  NPC (Merchant) & BED (OVERWORLD)
+      //  MERCHANT (NPC) & BED
       // ============================================================
-      const npc = {
-        tileX: TOWN_CENTER_X,
-        tileY: TOWN_CENTER_Y - 2
+      const merchantWorkTile = {
+        x: TOWN_CENTER_X,
+        y: TOWN_CENTER_Y - 2
       };
+
+      // Simple loop route around his stall
+      const merchantDayRoute = [
+        { x: merchantWorkTile.x,     y: merchantWorkTile.y     },
+        { x: merchantWorkTile.x + 1, y: merchantWorkTile.y     },
+        { x: merchantWorkTile.x + 1, y: merchantWorkTile.y + 1 },
+        { x: merchantWorkTile.x,     y: merchantWorkTile.y + 1 }
+      ];
+
+      const merchant = {
+        tileX: merchantWorkTile.x,
+        tileY: merchantWorkTile.y,
+        active: true,
+        state: "working", // "working" | "going_home" | "at_home" | "coming_to_work"
+        route: merchantDayRoute.slice(),
+        routeIndex: 0,
+        moveTimer: 0,
+        moveInterval: 0.35 // seconds per tile step
+      };
+
       function isOnNPCTile(tileX, tileY) {
         return currentSceneId === SceneId.OVERWORLD &&
-               tileX === npc.tileX && tileY === npc.tileY;
+               merchant.active &&
+               tileX === merchant.tileX &&
+               tileY === merchant.tileY;
       }
 
       const bed = {
@@ -779,7 +805,6 @@
         hudArea = area;
         if (!audioInitialized) return;
 
-        // Group farm/path/interior as "farm" music, town as town music
         const musicArea = (area === "town") ? "town" : "farm";
         if (currentBgmArea === musicArea) return;
         currentBgmArea = musicArea;
@@ -815,7 +840,6 @@
       }
 
       function updateCrops(dt) {
-        // Crops only exist in overworld
         for (let y = 0; y < WORLD_HEIGHT; y++) {
           const row = world[y];
           for (let x = 0; x < WORLD_WIDTH; x++) {
@@ -964,6 +988,113 @@
       }
 
       // ============================================================
+      //  MERCHANT MOVEMENT / SCHEDULE
+      // ============================================================
+      function buildStraightPath(fromX, fromY, toX, toY) {
+        const path = [];
+        let x = fromX;
+        let y = fromY;
+        const maxSteps = 512;
+        let steps = 0;
+        while ((x !== toX || y !== toY) && steps < maxSteps) {
+          if (x < toX) x++;
+          else if (x > toX) x--;
+          else if (y < toY) y++;
+          else if (y > toY) y--;
+          path.push({ x, y });
+          steps++;
+        }
+        return path;
+      }
+
+      function resetMerchantWorkingRoute() {
+        merchant.state = "working";
+        merchant.route = merchantDayRoute.slice();
+        merchant.routeIndex = 0;
+      }
+
+      function startMerchantGoingHome() {
+        merchant.state = "going_home";
+        merchant.active = true;
+        merchant.route = buildStraightPath(
+          merchant.tileX,
+          merchant.tileY,
+          house1ExteriorDoor.tileX,
+          house1ExteriorDoor.tileY
+        );
+        merchant.routeIndex = 0;
+      }
+
+      function startMerchantComingToWork() {
+        merchant.state = "coming_to_work";
+        merchant.tileX = house1ExteriorDoor.tileX;
+        merchant.tileY = house1ExteriorDoor.tileY;
+        merchant.active = true;
+        merchant.route = buildStraightPath(
+          merchant.tileX,
+          merchant.tileY,
+          merchantWorkTile.x,
+          merchantWorkTile.y
+        );
+        merchant.routeIndex = 0;
+      }
+
+      function stepMerchantAlongRoute() {
+        if (!merchant.route || merchant.route.length === 0) return;
+
+        if (merchant.routeIndex >= merchant.route.length) {
+          if (merchant.state === "working") {
+            merchant.routeIndex = 0;
+          } else if (merchant.state === "going_home") {
+            merchant.state = "at_home";
+            merchant.active = false;
+            merchant.route = [];
+            merchant.routeIndex = 0;
+            if (shopOpen) closeShop();
+          } else if (merchant.state === "coming_to_work") {
+            resetMerchantWorkingRoute();
+          }
+          return;
+        }
+
+        const next = merchant.route[merchant.routeIndex];
+        merchant.tileX = next.x;
+        merchant.tileY = next.y;
+        merchant.routeIndex++;
+
+        if (merchant.state === "working" && merchant.routeIndex >= merchant.route.length) {
+          merchant.routeIndex = 0;
+        } else if (merchant.state === "going_home" && merchant.routeIndex >= merchant.route.length) {
+          merchant.state = "at_home";
+          merchant.active = false;
+          merchant.route = [];
+          merchant.routeIndex = 0;
+          if (shopOpen) closeShop();
+        } else if (merchant.state === "coming_to_work" && merchant.routeIndex >= merchant.route.length) {
+          resetMerchantWorkingRoute();
+        }
+      }
+
+      function updateMerchant(dt) {
+        // Time-based state transitions
+        if (merchant.state === "working" && isNight()) {
+          startMerchantGoingHome();
+        } else if (!isNight() && (merchant.state === "at_home" || merchant.state === "going_home")) {
+          startMerchantComingToWork();
+        }
+
+        // Movement along current route
+        if (!merchant.active) return;
+        if (!merchant.route || merchant.route.length === 0) return;
+
+        merchant.moveTimer += dt;
+        if (merchant.moveTimer >= merchant.moveInterval) {
+          merchant.moveTimer -= merchant.moveInterval;
+          stepMerchantAlongRoute();
+        }
+      }
+
+      // ============================================================
       //  INTERACTION
       // ============================================================
       let wasSpaceDown = false;
@@ -1029,13 +1160,13 @@
           return;
         }
 
-        // NPC & farming only in overworld
+        // Merchant & farming only in overworld
         if (currentSceneId === SceneId.OVERWORLD) {
           if (isOnNPCTile(tileX, tileY)) {
             showTextBox(
               [
                 "Hey there! I buy crops and sell seeds.",
-                "Grow good stuff and I'll make it worth your while."
+                "I'm open during the day."
               ],
               { onComplete: () => openShop() }
             );
@@ -1049,7 +1180,6 @@
             return;
           }
 
-          // Harvest or check growth
           if (tile.crop) {
             if (tile.crop.stage >= CROP_STAGES) {
               const harvestedId = tile.crop.cropId;
@@ -1071,13 +1201,11 @@
             return;
           }
 
-          // No crop here
           if (tile.type === TileType.FARM_GRASS) {
             tile.type = TileType.TILLED;
             return;
           }
 
-          // TILLED, empty: plant if seeds selected
           const active = getActiveItem();
           if (!active || active.category !== "seed") {
             showTextBox(["Select seeds in your hotbar first."]);
@@ -1106,7 +1234,7 @@
           return;
         }
 
-        // Interiors: nothing special yet besides doors
+        // Interiors: placeholder interaction
         showTextBox(["A cozy room."]);
       }
 
@@ -1246,8 +1374,9 @@
 
       function drawNPC() {
         if (currentSceneId !== SceneId.OVERWORLD) return;
-        const screenX = npc.tileX * TILE_SIZE - camera.x;
-        const screenY = npc.tileY * TILE_SIZE - camera.y;
+        if (!merchant.active) return;
+        const screenX = merchant.tileX * TILE_SIZE - camera.x;
+        const screenY = merchant.tileY * TILE_SIZE - camera.y;
         ctx.fillStyle = "#f2c089";
         ctx.fillRect(screenX + 8, screenY + 6, TILE_SIZE - 16, TILE_SIZE - 12);
         ctx.fillStyle = "#5a3a2a";
@@ -1271,13 +1400,11 @@
         const hx = house1ExteriorDoor.tileX * TILE_SIZE - camera.x;
         const hy = house1ExteriorDoor.tileY * TILE_SIZE - camera.y;
 
-        // Simple little house shape anchored on the door tile
-        ctx.fillStyle = "#aa7d4f"; // wall
+        ctx.fillStyle = "#aa7d4f";
         ctx.fillRect(hx - TILE_SIZE, hy - TILE_SIZE * 2, TILE_SIZE * 3, TILE_SIZE * 2);
-        ctx.fillStyle = "#653b2a"; // roof
+        ctx.fillStyle = "#653b2a";
         ctx.fillRect(hx - TILE_SIZE - 2, hy - TILE_SIZE * 2 - 10, TILE_SIZE * 3 + 4, 12);
 
-        // Door highlight on the actual door tile
         ctx.strokeStyle = "#f4e38b";
         ctx.strokeRect(hx + 6, hy + 4, TILE_SIZE - 12, TILE_SIZE - 8);
       }
@@ -1634,6 +1761,7 @@
         }
         handleActionInput();
         updateCrops(dt);
+        updateMerchant(dt);
         updateDialogue(dt);
         updateCamera();
 
@@ -1645,7 +1773,7 @@
             milestones.firstEnterTown = true;
             showTextBox([
               "You arrive at a small town.",
-              "Maybe someone here buys crops..."
+              "The merchant keeps a schedule: open by day, home at night."
             ]);
           }
           lastArea = area;
@@ -1668,7 +1796,7 @@
       // ============================================================
       showTextBox([
         "Farm on the left, town on the right.",
-        "There's a house in town you can enter now.",
+        "The merchant walks around by day and goes home at night.",
         "Plant seeds, harvest crops, sleep, and explore."
       ]);
 
